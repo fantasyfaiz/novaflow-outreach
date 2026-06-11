@@ -164,7 +164,35 @@
 
     .contact-name  { font-size: 15px; font-weight: 600; color: #a78bfa; letter-spacing: 0.01em; margin-bottom: 5px; }
     .contact-line  { font-size: 11px; color: #505578; letter-spacing: 0.03em; line-height: 1.9; }
-    .contact-email { color: #6366f1; }
+
+    .contact-email-input {
+      font-family: inherit; font-size: 11px; color: #6366f1;
+      background: transparent; border: none; border-bottom: 1px solid rgba(99,102,241,0.18);
+      outline: none; width: 100%; padding: 2px 0; letter-spacing: 0.03em; line-height: 1.9;
+    }
+    .contact-email-input:focus { border-bottom-color: rgba(99,102,241,0.55); color: #818cf8; }
+    .contact-email-input::placeholder { color: #2e3155; }
+
+    .sender-from {
+      display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    }
+    .from-label {
+      font-size: 10px; color: #3d4168; letter-spacing: 0.12em; text-transform: uppercase; flex-shrink: 0;
+    }
+    .sender-email-input {
+      font-family: inherit; font-size: 11px; color: #6b7280;
+      background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.06);
+      outline: none; flex: 1; min-width: 0; padding: 2px 4px; letter-spacing: 0.03em;
+    }
+    .sender-email-input:focus { border-bottom-color: rgba(99,102,241,0.4); color: #a78bfa; }
+    .sender-email-input::placeholder { color: #2e3155; }
+
+    .back-link {
+      font-size: 10px; color: #3d4168; letter-spacing: 0.08em; text-transform: uppercase;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: #6366f1; }
 
     .subject-label { font-size: 10px; letter-spacing: 0.1em; color: #3d4168; text-transform: uppercase; margin-bottom: 4px; }
     .subject-val   { font-size: 11px; color: #505578; letter-spacing: 0.02em; margin-bottom: 10px; }
@@ -201,6 +229,8 @@
     #btn-approve:not(:disabled):hover  { background: rgba(16,185,129,0.22); border-color: rgba(16,185,129,0.5); }
     #btn-reject   { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #3d4168; }
     #btn-reject:hover { color: #505578; background: rgba(255,255,255,0.05); }
+    #btn-prev { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #3d4168; padding: 7px 12px; }
+    #btn-prev:not(:disabled):hover { color: #505578; background: rgba(255,255,255,0.05); }
 
     .done-msg { font-size: 13px; color: #a78bfa; margin-bottom: 6px; }
     .done-sub { font-size: 11px; color: #3d4168; }
@@ -299,6 +329,10 @@
       <!-- ══ EMAIL SCREEN ═══════════════════════════════════ -->
       <div id="screen-email">
 
+        <div>
+          <span class="back-link" onclick="backToUpload()">← lists</span>
+        </div>
+
         <div class="row">
           <div class="row-arrow">▸</div>
           <div class="row-body">
@@ -307,6 +341,11 @@
               <button class="sender-btn" data-sender="faiz"    onclick="selectSender('faiz')">Faiz</button>
               <button class="sender-btn" data-sender="ashwini" onclick="selectSender('ashwini')">Ashwini</button>
               <button class="sender-btn" data-sender="amulya"  onclick="selectSender('amulya')">Amulya</button>
+            </div>
+            <div class="sender-from">
+              <span class="from-label">from</span>
+              <input type="email" id="sender-email" class="sender-email-input"
+                     placeholder="your@email.com" autocomplete="email">
             </div>
           </div>
         </div>
@@ -329,7 +368,8 @@
               <div class="contact-name" id="contact-name">loading...</div>
               <div class="contact-line" id="contact-title"></div>
               <div class="contact-line" id="contact-company"></div>
-              <div class="contact-line contact-email" id="contact-email"></div>
+              <input type="email" class="contact-email-input" id="contact-email"
+                     placeholder="no email on file — enter manually">
             </div>
           </div>
 
@@ -350,9 +390,10 @@
             <div class="row-arrow" style="visibility:hidden">▸</div>
             <div class="row-body">
               <div class="action-row">
+                <button class="act-btn" id="btn-prev"     onclick="prevContact()" disabled>◀</button>
                 <button class="act-btn" id="btn-generate" onclick="generateEmail()" disabled>▸ generate()</button>
                 <button class="act-btn" id="btn-approve"  onclick="approve()"       disabled>▸ send()</button>
-                <button class="act-btn" id="btn-reject"   onclick="reject()">▸ skip()</button>
+                <button class="act-btn" id="btn-reject"   onclick="reject()">▸ next()</button>
               </div>
             </div>
           </div>
@@ -536,13 +577,13 @@ function switchToEmail() {
 }
 
 /* ── Email flow ────────────────────────────────────────────── */
-let contacts      = [];   // full list — loaded from server, stored client-side
-let paraCache     = {};   // contact.email → generated paragraph
-let currentIdx    = 0;
+let contacts       = [];   // full list — stored client-side after load
+let paraCache      = {};   // contact.email → generated paragraph
+let currentIdx     = 0;
 let currentContact = null;
-let currentEmail  = null;
-let currentSender = null;
-let total         = 0;
+let currentEmail   = null;
+let currentSender  = null;
+let total          = 0;
 
 function selectSender(key) {
   currentSender = key;
@@ -552,7 +593,6 @@ function selectSender(key) {
   if (currentContact) {
     const para = paraCache[currentContact.email];
     if (para) {
-      // rebuild instantly from cache — no API call
       currentEmail = buildEmail(currentContact, para, key);
       document.getElementById('email-preview').textContent = currentEmail;
       document.getElementById('btn-approve').disabled  = false;
@@ -571,13 +611,14 @@ function updateProgress(idx) {
 }
 
 function loadContact(idx) {
-  currentIdx    = idx;
-  currentEmail  = null;
+  currentIdx     = idx;
+  currentEmail   = null;
   currentContact = contacts[idx] || null;
 
   document.getElementById('btn-approve').disabled  = true;
   document.getElementById('btn-generate').disabled = !currentSender;
   document.getElementById('btn-generate').textContent = '▸ generate()';
+  document.getElementById('btn-prev').disabled = (idx <= 0);
 
   updateProgress(idx);
 
@@ -590,12 +631,15 @@ function loadContact(idx) {
     return;
   }
 
+  // Ensure main-view is visible (needed when navigating back from done state)
+  document.getElementById('main-view').style.display = 'flex';
+  document.getElementById('done-view').style.display = 'none';
+
   document.getElementById('contact-name').textContent    = `${currentContact.first_name} ${currentContact.last_name}`;
   document.getElementById('contact-title').textContent   = currentContact.job_title;
   document.getElementById('contact-company').textContent = currentContact.company;
-  document.getElementById('contact-email').textContent   = currentContact.email;
+  document.getElementById('contact-email').value         = currentContact.email || '';
 
-  // Restore from cache if available
   const para = paraCache[currentContact.email];
   if (para && currentSender) {
     currentEmail = buildEmail(currentContact, para, currentSender);
@@ -645,15 +689,49 @@ async function generateEmail() {
 }
 
 function approve() {
-  if (!currentContact || !currentEmail) return;
-  const to      = encodeURIComponent(currentContact.email);
+  if (!currentEmail) return;
+  const to      = encodeURIComponent(document.getElementById('contact-email').value.trim());
   const subject = encodeURIComponent('Following up from Festival of Genomics -> Novaflow');
   const body    = encodeURIComponent(currentEmail);
-  window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+  if (to) window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
   loadContact(currentIdx + 1);
 }
 
-function reject() { loadContact(currentIdx + 1); }
+function prevContact() { if (currentIdx > 0) loadContact(currentIdx - 1); }
+function reject()       { loadContact(currentIdx + 1); }
+
+function backToUpload() {
+  // Clear state
+  contacts = []; paraCache = {}; currentIdx = 0;
+  currentContact = null; currentEmail = null; total = 0;
+
+  // Reset upload UI
+  document.getElementById('upload-feedback-row').style.display = 'none';
+  document.getElementById('upload-error').style.display        = 'none';
+  document.getElementById('upload-preview').style.display      = 'none';
+  const fogBtn = document.getElementById('btn-fog-faiz');
+  fogBtn.disabled = false; fogBtn.querySelector('.p-name').textContent = 'FOG — Faiz';
+  document.getElementById('contact-count').textContent = '—';
+
+  // Reset email screen for next visit
+  document.getElementById('main-view').style.display = 'flex';
+  document.getElementById('done-view').style.display  = 'none';
+  document.getElementById('email-preview').innerHTML  =
+    '<span class="placeholder">select a sender above, then run generate().</span>';
+  document.getElementById('btn-approve').disabled   = true;
+  document.getElementById('btn-generate').disabled  = true;
+  document.getElementById('btn-prev').disabled      = true;
+  document.getElementById('progress-bar').style.width       = '0%';
+  document.getElementById('progress-label').textContent     = '— / — contacts';
+  document.getElementById('contact-name').textContent       = 'loading...';
+  document.getElementById('contact-title').textContent      = '';
+  document.getElementById('contact-company').textContent    = '';
+  document.getElementById('contact-email').value            = '';
+
+  // Switch screens
+  document.getElementById('screen-email').style.display  = 'none';
+  document.getElementById('screen-upload').style.display = 'flex';
+}
 </script>
 </body>
 </html>
