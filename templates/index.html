@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novaflow Outreach</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Menlo', 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      background:
+        radial-gradient(ellipse 80% 70% at 30% 60%, rgba(139,92,246,0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 75% 30%, rgba(109,40,217,0.35) 0%, transparent 55%),
+        radial-gradient(ellipse 100% 80% at 50% 50%, #2e1065 0%, #1a0a40 50%, #0d0820 100%);
+    }
+
+    /* ─── Window ──────────────────────────────────────────── */
+    .window {
+      width: 100%;
+      max-width: 980px;
+      background: #12142a;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.06),
+        0 40px 100px rgba(0,0,0,0.75),
+        0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: #191b33;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      user-select: none;
+    }
+    .traffic-lights { display: flex; gap: 8px; }
+    .tl { width: 12px; height: 12px; border-radius: 50%; }
+    .tl-red    { background: #ff5f56; }
+    .tl-yellow { background: #ffbd2e; }
+    .tl-green  { background: #27c93f; }
+    .title-center {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: #ddd6f3; letter-spacing: 0.03em;
+    }
+    .sparkle { color: #a78bfa; font-size: 15px; }
+    .cli-prompt { color: #4b5280; margin-left: 2px; }
+    .titlebar-version { font-size: 11px; color: #3d4168; letter-spacing: 0.07em; }
+
+    /* ─── Layout ──────────────────────────────────────────── */
+    .workspace { display: flex; min-height: 580px; }
+
+    .left-col {
+      flex: 1; min-width: 0;
+      padding: 32px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .right-col {
+      width: 220px; flex-shrink: 0;
+      position: relative;
+      border-left: 1px solid rgba(255,255,255,0.04);
+    }
+
+    /* ─── Shared rows ─────────────────────────────────────── */
+    .row { display: flex; align-items: flex-start; gap: 12px; }
+    .row-arrow { color: #6366f1; font-size: 11px; margin-top: 2px; flex-shrink: 0; }
+    .row-body  { flex: 1; min-width: 0; }
+    .section-label {
+      font-size: 10px; letter-spacing: 0.14em; color: #3d4168;
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+
+    /* ─── UPLOAD SCREEN ───────────────────────────────────── */
+    #screen-upload { display: flex; flex-direction: column; gap: 28px; flex: 1; }
+
+    .upload-cols { display: flex; gap: 20px; align-items: flex-start; }
+
+    .dropzone {
+      flex: 1;
+      border: 1px dashed rgba(99,102,241,0.22);
+      border-radius: 9px;
+      padding: 30px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      background: rgba(99,102,241,0.02);
+    }
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: rgba(99,102,241,0.5);
+      background: rgba(99,102,241,0.06);
+    }
+    .dropzone.uploading { pointer-events: none; opacity: 0.6; }
+    .dz-icon { font-size: 22px; color: #3d4168; margin-bottom: 10px; }
+    .dz-main { font-size: 12px; color: #505578; margin-bottom: 4px; }
+    .dz-sub  { font-size: 11px; color: #3d4168; }
+    .dz-hint {
+      font-size: 10px; color: #2e3155; letter-spacing: 0.04em;
+      margin-top: 12px; line-height: 1.9;
+      border-top: 1px solid rgba(255,255,255,0.04); padding-top: 10px;
+    }
+
+    .preset-list { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+    .preset-btn {
+      font-family: inherit; font-size: 12px; letter-spacing: 0.03em;
+      padding: 10px 16px; border-radius: 8px;
+      border: 1px solid rgba(167,139,250,0.18);
+      background: rgba(124,58,237,0.07); color: #c4b5fd;
+      cursor: pointer; display: flex; align-items: center; gap: 10px;
+      transition: all 0.15s; text-align: left;
+    }
+    .preset-btn:hover  { border-color: rgba(167,139,250,0.4); background: rgba(124,58,237,0.14); }
+    .preset-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .p-icon { color: #a78bfa; font-size: 14px; flex-shrink: 0; }
+    .p-name { font-weight: 600; color: #e9d5ff; }
+    .p-desc { font-size: 10px; color: #6b7280; margin-top: 2px; letter-spacing: 0.03em; }
+
+    .upload-status {
+      display: none; font-size: 12px; letter-spacing: 0.02em;
+      padding: 12px 16px; border-radius: 7px;
+    }
+    .upload-status.error   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+    .upload-status.success { background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.18); color: #6ee7b7; }
+
+    .preview-count { font-size: 20px; font-weight: 600; color: #a78bfa; margin-bottom: 4px; }
+    .preview-note  { font-size: 11px; color: #505578; letter-spacing: 0.04em; margin-bottom: 16px; }
+
+    .begin-btn {
+      font-family: inherit; font-size: 12px; letter-spacing: 0.05em;
+      padding: 8px 20px; border-radius: 6px;
+      border: 1px solid rgba(109,40,217,0.4);
+      background: rgba(109,40,217,0.18); color: #c4b5fd;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .begin-btn:hover { background: rgba(109,40,217,0.28); border-color: rgba(124,58,237,0.6); }
+
+    /* ─── EMAIL SCREEN ────────────────────────────────────── */
+    #screen-email { display: none; flex-direction: column; gap: 26px; flex: 1; }
+
+    .sender-pills { display: flex; gap: 8px; }
+    .sender-btn {
+      font-family: inherit; font-size: 12px; letter-spacing: 0.04em;
+      padding: 5px 18px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.03); color: #4b5280;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .sender-btn:hover  { border-color: rgba(139,92,246,0.45); color: #c4b5fd; background: rgba(139,92,246,0.08); }
+    .sender-btn.active { border-color: rgba(124,58,237,0.7); background: rgba(124,58,237,0.18); color: #ede9fe; }
+
+    .progress-track { height: 2px; background: rgba(255,255,255,0.05); border-radius: 999px; overflow: hidden; margin-bottom: 7px; }
+    .progress-fill  { height: 100%; background: linear-gradient(90deg, #6d28d9, #a78bfa); border-radius: 999px; transition: width 0.5s ease; }
+    .progress-text  { font-size: 11px; color: #3d4168; letter-spacing: 0.05em; }
+
+    .contact-name  { font-size: 15px; font-weight: 600; color: #a78bfa; letter-spacing: 0.01em; margin-bottom: 5px; }
+    .contact-line  { font-size: 11px; color: #505578; letter-spacing: 0.03em; line-height: 1.9; }
+    .contact-email { color: #6366f1; }
+
+    .subject-label { font-size: 10px; letter-spacing: 0.1em; color: #3d4168; text-transform: uppercase; margin-bottom: 4px; }
+    .subject-val   { font-size: 11px; color: #505578; letter-spacing: 0.02em; margin-bottom: 10px; }
+
+    .email-box {
+      background: #0c0e1e; border: 1px solid rgba(255,255,255,0.04); border-radius: 8px;
+      padding: 16px 18px; font-size: 11.5px; line-height: 1.8; color: #8892b0;
+      white-space: pre-wrap; min-height: 160px; max-height: 230px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: rgba(109,40,217,0.25) transparent;
+    }
+    .email-box::-webkit-scrollbar       { width: 4px; }
+    .email-box::-webkit-scrollbar-track { background: transparent; }
+    .email-box::-webkit-scrollbar-thumb { background: rgba(109,40,217,0.3); border-radius: 4px; }
+    .placeholder { color: #2a2d4a; font-style: italic; }
+
+    .spinner {
+      display: none; width: 14px; height: 14px;
+      border: 1.5px solid rgba(109,40,217,0.2); border-top-color: #7c3aed;
+      border-radius: 50%; animation: spin 0.65s linear infinite; margin: 10px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .action-row { display: flex; gap: 8px; }
+    .act-btn {
+      font-family: inherit; font-size: 11px; letter-spacing: 0.05em;
+      padding: 7px 15px; border-radius: 6px; border: 1px solid transparent;
+      cursor: pointer; transition: all 0.12s;
+    }
+    .act-btn:active:not(:disabled) { transform: scale(0.96); }
+    .act-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+    #btn-generate { background: rgba(109,40,217,0.18); border-color: rgba(109,40,217,0.35); color: #c4b5fd; }
+    #btn-generate:not(:disabled):hover { background: rgba(109,40,217,0.28); border-color: rgba(124,58,237,0.6); }
+    #btn-approve  { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.25); color: #6ee7b7; }
+    #btn-approve:not(:disabled):hover  { background: rgba(16,185,129,0.22); border-color: rgba(16,185,129,0.5); }
+    #btn-reject   { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.06); color: #3d4168; }
+    #btn-reject:hover { color: #505578; background: rgba(255,255,255,0.05); }
+
+    .done-msg { font-size: 13px; color: #a78bfa; margin-bottom: 6px; }
+    .done-sub { font-size: 11px; color: #3d4168; }
+
+    /* ─── Right col ───────────────────────────────────────── */
+    #particle-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    .status-spine {
+      position: absolute; right: 16px; top: 0; bottom: 0;
+      display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
+      pointer-events: none;
+    }
+    .sdot { width: 7px; height: 7px; border-radius: 50%; }
+    .sdot-on  { background: #4ade80; box-shadow: 0 0 6px #4ade80, 0 0 14px rgba(74,222,128,0.25); }
+    .sdot-off { background: #1c1f38; }
+
+    .active-label {
+      position: absolute; bottom: 18px; right: 10px;
+      font-size: 10px; letter-spacing: 0.06em; color: #3d4168;
+      white-space: nowrap; display: flex; align-items: center; gap: 5px;
+    }
+    .active-label .dot-green { color: #4ade80; }
+  </style>
+</head>
+<body>
+
+<div class="window">
+
+  <div class="titlebar">
+    <div class="traffic-lights">
+      <div class="tl tl-red"></div>
+      <div class="tl tl-yellow"></div>
+      <div class="tl tl-green"></div>
+    </div>
+    <div class="title-center">
+      <span class="sparkle">✦</span>
+      Novaflow
+      <span class="cli-prompt">&gt;_</span>
+    </div>
+    <div class="titlebar-version">outreach v1.0</div>
+  </div>
+
+  <div class="workspace">
+
+    <div class="left-col">
+
+      <!-- ══ UPLOAD SCREEN ══════════════════════════════════ -->
+      <div id="screen-upload">
+
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">load contact list</div>
+            <div class="upload-cols">
+
+              <div class="dropzone" id="dropzone">
+                <div class="dz-icon">⊕</div>
+                <div class="dz-main" id="dz-main-text">drag &amp; drop .csv</div>
+                <div class="dz-sub">or click to browse</div>
+                <div class="dz-hint">
+                  requires: First Name, Last Name,<br>
+                  Email, Company, Job Title
+                </div>
+              </div>
+              <input type="file" id="file-input" accept=".csv" style="display:none">
+
+              <div class="preset-list">
+                <div class="section-label">or preloaded list</div>
+                <button class="preset-btn" id="btn-fog-faiz" onclick="loadPreset()">
+                  <span class="p-icon">✦</span>
+                  <div>
+                    <div class="p-name">FOG &mdash; Faiz</div>
+                    <div class="p-desc">Festival of Genomics &middot; 45 contacts</div>
+                  </div>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="row" id="upload-feedback-row" style="display:none;">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="upload-status error"   id="upload-error"></div>
+            <div id="upload-preview" style="display:none;">
+              <div class="preview-count" id="preview-count"></div>
+              <div class="preview-note"  id="preview-note"></div>
+              <button class="begin-btn" onclick="beginOutreach()">▸ begin outreach()</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ══ EMAIL SCREEN ═══════════════════════════════════ -->
+      <div id="screen-email">
+
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">sending as</div>
+            <div class="sender-pills">
+              <button class="sender-btn" data-sender="faiz"    onclick="selectSender('faiz')">Faiz</button>
+              <button class="sender-btn" data-sender="ashwini" onclick="selectSender('ashwini')">Ashwini</button>
+              <button class="sender-btn" data-sender="amulya"  onclick="selectSender('amulya')">Amulya</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="progress-track">
+              <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+            </div>
+            <div class="progress-text" id="progress-label">— / — contacts</div>
+          </div>
+        </div>
+
+        <div id="main-view" style="display:flex; flex-direction:column; gap:26px;">
+
+          <div class="row">
+            <div class="row-arrow">▸</div>
+            <div class="row-body">
+              <div class="contact-name" id="contact-name">loading...</div>
+              <div class="contact-line" id="contact-title"></div>
+              <div class="contact-line" id="contact-company"></div>
+              <div class="contact-line contact-email" id="contact-email"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-arrow">▸</div>
+            <div class="row-body">
+              <div class="section-label">draft</div>
+              <div class="subject-label">subject</div>
+              <div class="subject-val">Following up from Festival of Genomics -&gt; Novaflow</div>
+              <div class="email-box" id="email-preview">
+                <span class="placeholder">select a sender above, then run generate().</span>
+              </div>
+              <div class="spinner" id="spinner"></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-arrow" style="visibility:hidden">▸</div>
+            <div class="row-body">
+              <div class="action-row">
+                <button class="act-btn" id="btn-generate" onclick="generateEmail()" disabled>▸ generate()</button>
+                <button class="act-btn" id="btn-approve"  onclick="approve()"       disabled>▸ send()</button>
+                <button class="act-btn" id="btn-reject"   onclick="reject()">▸ skip()</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="done-view" style="display:none;">
+          <div class="row">
+            <div class="row-arrow">▸</div>
+            <div class="row-body" style="padding-top:20px;">
+              <div class="done-msg">all done.</div>
+              <div class="done-sub" id="done-msg-sub"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="right-col">
+      <canvas id="particle-canvas"></canvas>
+      <div class="status-spine">
+        <div class="sdot sdot-on"></div>
+        <div class="sdot sdot-on"></div>
+        <div class="sdot sdot-off"></div>
+        <div class="sdot sdot-on"></div>
+        <div class="sdot sdot-off"></div>
+        <div class="sdot sdot-on"></div>
+      </div>
+      <div class="active-label">
+        <span class="dot-green">●</span>
+        <span id="contact-count">—</span> contacts
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Particles ─────────────────────────────────────────────── */
+(function () {
+  const canvas = document.getElementById('particle-canvas');
+  const ctx    = canvas.getContext('2d');
+  function resize() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; }
+  resize();
+  new ResizeObserver(resize).observe(canvas);
+
+  const PALS = [[167,139,250],[139,92,246],[109,40,217],[99,102,241],[52,211,153]];
+  function mk() {
+    const col = Math.random() < 0.10 ? PALS[4] : PALS[Math.floor(Math.random() * 4)];
+    return {
+      baseX: (0.08 + Math.random() * 0.78) * canvas.width,
+      baseY: Math.random() * canvas.height,
+      phase: Math.random() * Math.PI * 2,
+      phaseSpeed: 0.006 + Math.random() * 0.008,
+      ampX: 6 + Math.random() * 12, ampY: 4 + Math.random() * 8,
+      drift: 0.12 + Math.random() * 0.22,
+      r: 0.8 + Math.random() * 2.2,
+      alpha: 0.15 + Math.random() * 0.55, col,
+    };
+  }
+  const pts = Array.from({ length: 48 }, mk);
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pts.forEach((p, i) => {
+      p.phase += p.phaseSpeed; p.baseY -= p.drift;
+      const x = p.baseX + Math.cos(p.phase) * p.ampX;
+      const y = p.baseY + Math.sin(p.phase * 1.4) * p.ampY;
+      ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.col},${p.alpha})`; ctx.fill();
+      if (p.baseY < -12) { pts[i] = mk(); pts[i].baseY = canvas.height + 8; }
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ── Email template (mirrors api/index.py logic) ──────────── */
+const SENDERS = {
+  faiz:    { intro: 'I am a USC student working with the team and wanted to personally follow up.',           signOff: 'Faiz',    calendarLine: true  },
+  ashwini: { intro: 'I am a UC Berkeley student working with the team and wanted to personally follow up.',   signOff: 'Ashwini', calendarLine: true  },
+  amulya:  { intro: 'I am the CTO and co-founder of Novaflow and wanted to personally follow up.',            signOff: 'Amulya',  calendarLine: false },
+};
+const CALENDAR_URL    = 'https://calendar.app.google/H8V4u6jMeatRvjfy8';
+const SENIOR_KEYWORDS = ['director','principal','senior','lead','head','vp','vice president','chief','advisor','adviser','professor','fellow','manager','scientist'];
+const SENIOR_CLOSING  = "Regardless, as a student, any advice from you would go a long way and I really hope to stay in touch!";
+const JUNIOR_CLOSING  = "I hope we can stay in touch and would love to explore how Novaflow could help with your research!";
+const AMULYA_CLOSING  = `I would love to find some time to connect and explore how Novaflow could help your work. Feel free to book a time here: ${CALENDAR_URL}`;
+
+function pickClosing(jobTitle, senderKey) {
+  if (senderKey === 'amulya') return AMULYA_CLOSING;
+  return SENIOR_KEYWORDS.some(t => jobTitle.toLowerCase().includes(t)) ? SENIOR_CLOSING : JUNIOR_CLOSING;
+}
+
+function buildEmail(contact, para, senderKey) {
+  const sender  = SENDERS[senderKey];
+  const closing = pickClosing(contact.job_title, senderKey);
+  let body = `Hello ${contact.first_name},\n\n`;
+  body += `I am so happy you connected with the Novaflow team last week at the Festival of Genomics! ${sender.intro}\n\n`;
+  body += `${para}\n\n`;
+  if (sender.calendarLine) body += `Feel free to book a time to chat here: ${CALENDAR_URL} or just reply and we can figure out next steps over email.\n\n`;
+  body += `${closing}\n\n${sender.signOff}`;
+  return body;
+}
+
+/* ── Upload screen ─────────────────────────────────────────── */
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('click',    () => fileInput.click());
+dropzone.addEventListener('dragover',  e  => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+function showFeedbackRow() {
+  document.getElementById('upload-feedback-row').style.display = 'flex';
+}
+function showUploadError(msg) {
+  const el = document.getElementById('upload-error');
+  el.textContent = '✕  ' + msg; el.style.display = 'block';
+  document.getElementById('upload-preview').style.display = 'none';
+  showFeedbackRow();
+}
+function showUploadPreview(count, note) {
+  document.getElementById('upload-error').style.display   = 'none';
+  document.getElementById('preview-count').textContent    = `✓  ${count} contacts ready`;
+  document.getElementById('preview-note').textContent     = note;
+  document.getElementById('upload-preview').style.display = 'block';
+  document.getElementById('contact-count').textContent    = count;
+  showFeedbackRow();
+}
+
+async function handleFile(file) {
+  dropzone.classList.add('uploading');
+  document.getElementById('dz-main-text').textContent = 'parsing...';
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const data = await fetch('/api/upload', { method: 'POST', body: fd }).then(r => r.json());
+    if (data.error) { showUploadError(data.error); }
+    else { contacts = data.contacts; total = contacts.length; showUploadPreview(total, data.note); }
+  } catch { showUploadError('Network error. Try again.'); }
+  finally {
+    dropzone.classList.remove('uploading');
+    document.getElementById('dz-main-text').textContent = 'drag & drop .csv';
+    fileInput.value = '';
+  }
+}
+
+async function loadPreset() {
+  const btn = document.getElementById('btn-fog-faiz');
+  btn.disabled = true;
+  btn.querySelector('.p-name').textContent = 'loading...';
+  try {
+    const data = await fetch('/api/preset/fog-faiz').then(r => r.json());
+    if (data.error) {
+      showUploadError(data.error);
+      btn.disabled = false; btn.querySelector('.p-name').textContent = 'FOG — Faiz';
+      return;
+    }
+    contacts = data.contacts; total = contacts.length;
+    document.getElementById('contact-count').textContent = total;
+    selectSender('faiz');
+    switchToEmail();
+  } catch {
+    showUploadError('Network error. Try again.');
+    btn.disabled = false; btn.querySelector('.p-name').textContent = 'FOG — Faiz';
+  }
+}
+
+function beginOutreach() { switchToEmail(); }
+
+function switchToEmail() {
+  document.getElementById('screen-upload').style.display = 'none';
+  document.getElementById('screen-email').style.display  = 'flex';
+  loadContact(0);
+}
+
+/* ── Email flow ────────────────────────────────────────────── */
+let contacts      = [];   // full list — loaded from server, stored client-side
+let paraCache     = {};   // contact.email → generated paragraph
+let currentIdx    = 0;
+let currentContact = null;
+let currentEmail  = null;
+let currentSender = null;
+let total         = 0;
+
+function selectSender(key) {
+  currentSender = key;
+  document.querySelectorAll('.sender-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.sender === key)
+  );
+  if (currentContact) {
+    const para = paraCache[currentContact.email];
+    if (para) {
+      // rebuild instantly from cache — no API call
+      currentEmail = buildEmail(currentContact, para, key);
+      document.getElementById('email-preview').textContent = currentEmail;
+      document.getElementById('btn-approve').disabled  = false;
+      document.getElementById('btn-generate').textContent = '▸ regenerate()';
+      document.getElementById('btn-generate').disabled = false;
+    } else {
+      document.getElementById('btn-generate').disabled = false;
+    }
+  }
+}
+
+function updateProgress(idx) {
+  const pct = total > 0 ? Math.round((idx / total) * 100) : 0;
+  document.getElementById('progress-bar').style.width  = pct + '%';
+  document.getElementById('progress-label').textContent = `${idx} / ${total} contacts`;
+}
+
+function loadContact(idx) {
+  currentIdx    = idx;
+  currentEmail  = null;
+  currentContact = contacts[idx] || null;
+
+  document.getElementById('btn-approve').disabled  = true;
+  document.getElementById('btn-generate').disabled = !currentSender;
+  document.getElementById('btn-generate').textContent = '▸ generate()';
+
+  updateProgress(idx);
+
+  if (!currentContact) {
+    document.getElementById('main-view').style.display = 'none';
+    document.getElementById('done-view').style.display = 'block';
+    document.getElementById('done-msg-sub').textContent = `${total} contacts reviewed.`;
+    document.getElementById('progress-bar').style.width  = '100%';
+    document.getElementById('progress-label').textContent = `${total} / ${total} complete`;
+    return;
+  }
+
+  document.getElementById('contact-name').textContent    = `${currentContact.first_name} ${currentContact.last_name}`;
+  document.getElementById('contact-title').textContent   = currentContact.job_title;
+  document.getElementById('contact-company').textContent = currentContact.company;
+  document.getElementById('contact-email').textContent   = currentContact.email;
+
+  // Restore from cache if available
+  const para = paraCache[currentContact.email];
+  if (para && currentSender) {
+    currentEmail = buildEmail(currentContact, para, currentSender);
+    document.getElementById('email-preview').textContent = currentEmail;
+    document.getElementById('btn-approve').disabled  = false;
+    document.getElementById('btn-generate').textContent = '▸ regenerate()';
+  } else {
+    document.getElementById('email-preview').innerHTML =
+      '<span class="placeholder">' +
+      (currentSender ? 'click generate() to draft.' : 'select a sender first.') +
+      '</span>';
+  }
+}
+
+async function generateEmail() {
+  if (!currentSender || !currentContact) return;
+  document.getElementById('btn-generate').disabled = true;
+  document.getElementById('spinner').style.display = 'block';
+  document.getElementById('email-preview').innerHTML = '';
+  document.getElementById('btn-approve').disabled = true;
+
+  try {
+    const data = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact: currentContact }),
+    }).then(r => r.json());
+
+    document.getElementById('spinner').style.display = 'none';
+    if (data.error) {
+      document.getElementById('email-preview').innerHTML = `<span style="color:#f87171">error: ${data.error}</span>`;
+      document.getElementById('btn-generate').disabled = false;
+      return;
+    }
+
+    paraCache[currentContact.email] = data.para;
+    currentEmail = buildEmail(currentContact, data.para, currentSender);
+    document.getElementById('email-preview').textContent = currentEmail;
+    document.getElementById('btn-approve').disabled  = false;
+    document.getElementById('btn-generate').disabled = false;
+    document.getElementById('btn-generate').textContent = '▸ regenerate()';
+  } catch {
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('email-preview').innerHTML = '<span style="color:#f87171">network error. try again.</span>';
+    document.getElementById('btn-generate').disabled = false;
+  }
+}
+
+function approve() {
+  if (!currentContact || !currentEmail) return;
+  const to      = encodeURIComponent(currentContact.email);
+  const subject = encodeURIComponent('Following up from Festival of Genomics -> Novaflow');
+  const body    = encodeURIComponent(currentEmail);
+  window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+  loadContact(currentIdx + 1);
+}
+
+function reject() { loadContact(currentIdx + 1); }
+</script>
+</body>
+</html>
