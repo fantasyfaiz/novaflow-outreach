@@ -10,6 +10,7 @@ FOG_CSV_PATH = os.path.join(BASE_DIR, 'data', 'fog_booth_only.csv')
 app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'))
 
 REQUIRED_COLS = {'First Name', 'Last Name', 'Email', 'Company', 'Job Title'}
+CANONICAL     = {col.lower(): col for col in REQUIRED_COLS | {'Grade'}}
 
 
 def parse_csv_stream(stream):
@@ -20,8 +21,9 @@ def parse_csv_stream(stream):
     except UnicodeDecodeError:
         text = raw.decode('latin-1')
 
-    reader    = csv.DictReader(io.StringIO(text))
-    fieldnames = set(reader.fieldnames or [])
+    reader = csv.DictReader(io.StringIO(text))
+    reader.fieldnames = [CANONICAL.get(f.lower(), f) for f in (reader.fieldnames or [])]
+    fieldnames = set(reader.fieldnames)
     missing   = REQUIRED_COLS - fieldnames
     if missing:
         raise ValueError(f'Missing required columns: {", ".join(sorted(missing))}')
