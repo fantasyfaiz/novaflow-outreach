@@ -634,7 +634,7 @@ function pickClosing(jobTitle, senderKey) {
 
 function getSubject() {
   if (currentMode === 'conference' && conferenceName) {
-    return `Following up from ${conferenceName} -> Novaflow`;
+    return `Following up from ${conferenceName} — Novaflow`;
   }
   return 'Following up from Festival of Genomics -> Novaflow';
 }
@@ -645,7 +645,7 @@ function buildEmail(contact, para, senderKey) {
   let body = `Hello ${contact.first_name},\n\n`;
   if (currentMode === 'conference' && conferenceName) {
     const loc = conferenceLocation ? ` in ${conferenceLocation}` : '';
-    body += `I am so happy you connected with the Novaflow team at ${conferenceName}${loc}! ${sender.intro}\n\n`;
+    body += `I wanted to follow up after ${conferenceName}${loc}.\n\n`;
   } else {
     body += `I am so happy you connected with the Novaflow team last week at the Festival of Genomics! ${sender.intro}\n\n`;
   }
