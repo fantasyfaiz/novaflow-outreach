@@ -7,7 +7,10 @@ from flask import Flask, render_template, jsonify, request
 BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FOG_CSV_PATH = os.path.join(BASE_DIR, 'data', 'fog_booth_only.csv')
 
-app = Flask(__name__, template_folder=os.path.join(BASE_DIR, 'templates'))
+app = Flask(__name__,
+            template_folder=os.path.join(BASE_DIR, 'templates'),
+            static_folder=os.path.join(BASE_DIR, 'public'),
+            static_url_path='')
 
 REQUIRED_COLS = {'First Name', 'Last Name', 'Email', 'Company', 'Job Title'}
 CANONICAL     = {col.lower(): col for col in REQUIRED_COLS | {'Grade'}}
