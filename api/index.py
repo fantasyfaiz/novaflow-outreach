@@ -50,14 +50,18 @@ def parse_csv_stream(stream):
     return contacts, note
 
 
-def generate_paragraph(first_name, company, job_title):
+def generate_paragraph(first_name, company, job_title, conference_name='', conference_location=''):
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+    conference_line = ''
+    if conference_name:
+        loc = f' in {conference_location}' if conference_location else ''
+        conference_line = f'\n- The recipient connected with Novaflow at {conference_name}{loc}'
     prompt = f"""Write exactly ONE paragraph (4-5 sentences) for a biotech/genomics software outreach email.
 
 Recipient:
 - Name: {first_name}
 - Company: {company}
-- Job Title: {job_title}
+- Job Title: {job_title}{conference_line}
 
 About Novaflow:
 - Bioinformatics analysis platform that takes raw genomic/sequencing data and produces results fast
@@ -137,6 +141,8 @@ def generate_email():
             contact.get('first_name', ''),
             contact.get('company',    ''),
             contact.get('job_title',  ''),
+            data.get('conference_name', ''),
+            data.get('conference_location', ''),
         )
         return jsonify({'para': para})
     except Exception as e:

@@ -81,8 +81,41 @@
       text-transform: uppercase; margin-bottom: 10px;
     }
 
+    /* ─── MODE SCREEN ────────────────────────────────────── */
+    #screen-mode { display: flex; flex-direction: column; gap: 32px; flex: 1; justify-content: center; }
+
+    .mode-btns { display: flex; gap: 14px; }
+    .mode-btn {
+      flex: 1; font-family: inherit; font-size: 12px; letter-spacing: 0.03em;
+      padding: 22px 18px; border-radius: 10px;
+      border: 1px solid rgba(124,58,237,0.22);
+      background: rgba(124,58,237,0.05); color: #4c1d95;
+      cursor: pointer; transition: all 0.15s;
+      text-align: left; display: flex; flex-direction: column; gap: 8px;
+    }
+    .mode-btn:hover { border-color: rgba(124,58,237,0.48); background: rgba(124,58,237,0.11); }
+    .mode-btn-icon { font-size: 18px; }
+    .mode-btn-name { font-size: 13px; font-weight: 600; color: #4c1d95; }
+    .mode-btn-desc { font-size: 10px; color: #8b7bb8; letter-spacing: 0.03em; line-height: 1.6; }
+
+    /* ─── CONF INFO SCREEN ────────────────────────────────── */
+    #screen-conf-info { display: none; flex-direction: column; gap: 28px; flex: 1; }
+
+    .conf-field { display: flex; flex-direction: column; gap: 6px; }
+    .conf-label { font-size: 10px; letter-spacing: 0.12em; color: #8b7bb8; text-transform: uppercase; }
+    .conf-input {
+      font-family: inherit; font-size: 12px; color: #1e1340;
+      background: rgba(124,58,237,0.04);
+      border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 8px; outline: none;
+      width: 100%; padding: 10px 14px; letter-spacing: 0.02em;
+      transition: border-color 0.15s;
+    }
+    .conf-input:focus { border-color: rgba(124,58,237,0.5); }
+    .conf-input::placeholder { color: #c4b5fd; }
+
     /* ─── UPLOAD SCREEN ───────────────────────────────────── */
-    #screen-upload { display: flex; flex-direction: column; gap: 28px; flex: 1; }
+    #screen-upload { display: none; flex-direction: column; gap: 28px; flex: 1; }
 
     .upload-cols { display: flex; gap: 20px; align-items: flex-start; }
 
@@ -277,8 +310,67 @@
 
     <div class="left-col">
 
+      <!-- ══ MODE SCREEN ═══════════════════════════════════════ -->
+      <div id="screen-mode">
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">select mode</div>
+            <div class="mode-btns">
+              <button class="mode-btn" onclick="selectMode('researcher')">
+                <span class="mode-btn-icon">⊙</span>
+                <div class="mode-btn-name">Researcher Outreach</div>
+                <div class="mode-btn-desc">Cold outreach to research professionals</div>
+              </button>
+              <button class="mode-btn" onclick="selectMode('conference')">
+                <span class="mode-btn-icon">✦</span>
+                <div class="mode-btn-name">Conference Follow-up</div>
+                <div class="mode-btn-desc">Follow up with contacts from an event</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ CONF INFO SCREEN ══════════════════════════════════ -->
+      <div id="screen-conf-info">
+        <div>
+          <span class="back-link" onclick="backToModeSelect()">← mode</span>
+        </div>
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">conference details</div>
+            <div style="display:flex; flex-direction:column; gap:16px; margin-top:4px;">
+              <div class="conf-field">
+                <label class="conf-label">conference name</label>
+                <input type="text" id="conf-name" class="conf-input"
+                       placeholder="e.g. BIO International"
+                       onkeydown="if(event.key==='Enter') continueFromConferenceInfo()">
+              </div>
+              <div class="conf-field">
+                <label class="conf-label">location</label>
+                <input type="text" id="conf-location" class="conf-input"
+                       placeholder="e.g. San Diego, CA"
+                       onkeydown="if(event.key==='Enter') continueFromConferenceInfo()">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-arrow" style="visibility:hidden">▸</div>
+          <div class="row-body">
+            <button class="begin-btn" onclick="continueFromConferenceInfo()">▸ continue()</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ══ UPLOAD SCREEN ══════════════════════════════════ -->
       <div id="screen-upload">
+
+        <div>
+          <span class="back-link" onclick="backFromUpload()">← mode</span>
+        </div>
 
         <div class="row">
           <div class="row-arrow">▸</div>
@@ -378,7 +470,7 @@
             <div class="row-body">
               <div class="section-label">draft</div>
               <div class="subject-label">subject</div>
-              <div class="subject-val">Following up from Festival of Genomics -&gt; Novaflow</div>
+              <div class="subject-val" id="email-subject">Following up from Festival of Genomics -&gt; Novaflow</div>
               <div class="email-box" id="email-preview">
                 <span class="placeholder">select a sender above, then run generate().</span>
               </div>
@@ -472,6 +564,57 @@
   draw();
 })();
 
+/* ── Mode state ───────────────────────────────────────────── */
+let currentMode        = null;
+let conferenceName     = '';
+let conferenceLocation = '';
+
+function selectMode(mode) {
+  currentMode = mode;
+  document.getElementById('screen-mode').style.display = 'none';
+  if (mode === 'conference') {
+    document.getElementById('screen-conf-info').style.display = 'flex';
+  } else {
+    document.getElementById('screen-upload').style.display = 'flex';
+  }
+}
+
+function continueFromConferenceInfo() {
+  const name = document.getElementById('conf-name').value.trim();
+  const loc  = document.getElementById('conf-location').value.trim();
+  if (!name || !loc) return;
+  conferenceName     = name;
+  conferenceLocation = loc;
+  document.getElementById('screen-conf-info').style.display = 'none';
+  document.getElementById('screen-upload').style.display    = 'flex';
+}
+
+function backToModeSelect() {
+  conferenceName = ''; conferenceLocation = '';
+  document.getElementById('conf-name').value     = '';
+  document.getElementById('conf-location').value = '';
+  document.getElementById('screen-conf-info').style.display = 'none';
+  document.getElementById('screen-mode').style.display      = 'flex';
+  currentMode = null;
+}
+
+function backFromUpload() {
+  document.getElementById('upload-feedback-row').style.display = 'none';
+  document.getElementById('upload-error').style.display        = 'none';
+  document.getElementById('upload-preview').style.display      = 'none';
+  const fogBtn = document.getElementById('btn-fog-faiz');
+  fogBtn.disabled = false; fogBtn.querySelector('.p-name').textContent = 'FOG — Faiz';
+  document.getElementById('contact-count').textContent = '—';
+  contacts = []; total = 0;
+  document.getElementById('screen-upload').style.display = 'none';
+  if (currentMode === 'conference') {
+    document.getElementById('screen-conf-info').style.display = 'flex';
+  } else {
+    document.getElementById('screen-mode').style.display = 'flex';
+    currentMode = null;
+  }
+}
+
 /* ── Email template (mirrors api/index.py logic) ──────────── */
 const SENDERS = {
   faiz:    { intro: 'I am a USC student working with the team and wanted to personally follow up.',           signOff: 'Faiz',    calendarLine: true  },
@@ -489,11 +632,23 @@ function pickClosing(jobTitle, senderKey) {
   return SENIOR_KEYWORDS.some(t => jobTitle.toLowerCase().includes(t)) ? SENIOR_CLOSING : JUNIOR_CLOSING;
 }
 
+function getSubject() {
+  if (currentMode === 'conference' && conferenceName) {
+    return `Following up from ${conferenceName} -> Novaflow`;
+  }
+  return 'Following up from Festival of Genomics -> Novaflow';
+}
+
 function buildEmail(contact, para, senderKey) {
   const sender  = SENDERS[senderKey];
   const closing = pickClosing(contact.job_title, senderKey);
   let body = `Hello ${contact.first_name},\n\n`;
-  body += `I am so happy you connected with the Novaflow team last week at the Festival of Genomics! ${sender.intro}\n\n`;
+  if (currentMode === 'conference' && conferenceName) {
+    const loc = conferenceLocation ? ` in ${conferenceLocation}` : '';
+    body += `I am so happy you connected with the Novaflow team at ${conferenceName}${loc}! ${sender.intro}\n\n`;
+  } else {
+    body += `I am so happy you connected with the Novaflow team last week at the Festival of Genomics! ${sender.intro}\n\n`;
+  }
   body += `${para}\n\n`;
   if (sender.calendarLine) body += `Feel free to book a time to chat here: ${CALENDAR_URL} or just reply and we can figure out next steps over email.\n\n`;
   body += `${closing}\n\n${sender.signOff}`;
@@ -573,6 +728,7 @@ function beginOutreach() { switchToEmail(); }
 function switchToEmail() {
   document.getElementById('screen-upload').style.display = 'none';
   document.getElementById('screen-email').style.display  = 'flex';
+  document.getElementById('email-subject').textContent   = getSubject();
   loadContact(0);
 }
 
@@ -665,7 +821,11 @@ async function generateEmail() {
     const data = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contact: currentContact }),
+      body: JSON.stringify({
+        contact: currentContact,
+        conference_name:     currentMode === 'conference' ? conferenceName     : '',
+        conference_location: currentMode === 'conference' ? conferenceLocation : '',
+      }),
     }).then(r => r.json());
 
     document.getElementById('spinner').style.display = 'none';
@@ -691,7 +851,7 @@ async function generateEmail() {
 function approve() {
   if (!currentEmail) return;
   const to      = encodeURIComponent(document.getElementById('contact-email').value.trim());
-  const subject = encodeURIComponent('Following up from Festival of Genomics -> Novaflow');
+  const subject = encodeURIComponent(getSubject());
   const body    = encodeURIComponent(currentEmail);
   if (to) window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
   loadContact(currentIdx + 1);
@@ -731,6 +891,7 @@ function backToUpload() {
   // Switch screens
   document.getElementById('screen-email').style.display  = 'none';
   document.getElementById('screen-upload').style.display = 'flex';
+  document.getElementById('email-subject').textContent   = getSubject();
 }
 </script>
 </body>
