@@ -997,7 +997,22 @@ function approve() {
   const body    = encodeURIComponent(currentEmail);
   if (to) window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
   logOutreach(currentContact, emailAddr, currentSender);
+  if (emailAddr && currentContact) saveContact({ ...currentContact, email: emailAddr });
   loadContact(currentIdx + 1);
+}
+
+// Log a sent contact to Supabase. Fire-and-forget: never blocks the outreach flow.
+async function saveContact(contact) {
+  try {
+    const res = await fetch('/api/save-contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact, mode: currentMode || 'researcher' }),
+    }).then(r => r.json());
+    if (res.error) console.warn('save-contact failed:', res.error);
+  } catch (e) {
+    console.warn('save-contact network error:', e);
+  }
 }
 
 function prevContact() { if (currentIdx > 0) loadContact(currentIdx - 1); }
