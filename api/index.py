@@ -2,10 +2,13 @@ import os
 import csv
 import io
 import json
+import json as json_module
 import re
+import ssl
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta, timezone
+from html.parser import HTMLParser
 import anthropic
 import requests
 from bs4 import BeautifulSoup
@@ -22,6 +25,29 @@ app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'templates'),
             static_folder=os.path.join(BASE_DIR, 'public'),
             static_url_path='')
+
+class _TextExtractor(HTMLParser):
+    SKIP_TAGS = {'script', 'style', 'nav', 'footer', 'noscript', 'svg', 'iframe'}
+
+    def __init__(self):
+        super().__init__()
+        self.texts = []
+        self._depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self.SKIP_TAGS:
+            self._depth += 1
+
+    def handle_endtag(self, tag):
+        if tag in self.SKIP_TAGS and self._depth > 0:
+            self._depth -= 1
+
+    def handle_data(self, data):
+        if self._depth == 0:
+            t = data.strip()
+            if t:
+                self.texts.append(t)
+
 
 REQUIRED_COLS = {'First Name', 'Last Name', 'Email', 'Company', 'Job Title'}
 CANONICAL     = {col.lower(): col for col in REQUIRED_COLS | {'Grade'}}
@@ -271,12 +297,11 @@ def generate_followup_email():
 def scrape_contacts():
     data  = request.json or {}
     url   = data.get('url', '').strip()
-    query = data.get('query', '').strip()
+    query = data.get('institution', data.get('query', '')).strip()
 
     if not url and not query:
         return jsonify({'error': 'Provide a URL or institution name'}), 400
 
-    # If institution name given, try common people-page patterns
     if not url and query:
         slug = re.sub(r'[^a-z0-9]', '', query.lower())
         candidates = [
@@ -296,11 +321,9 @@ def scrape_contacts():
         if not url:
             return jsonify({'error': f'Could not find a people page for "{query}". Try pasting the URL directly.'}), 400
 
-    # Normalise URL
     if not url.startswith('http'):
         url = 'https://' + url
 
-    # Fetch page
     try:
         resp = requests.get(
             url, timeout=15,
@@ -315,17 +338,15 @@ def scrape_contacts():
     except Exception as e:
         return jsonify({'error': f'Could not fetch page: {str(e)}'}), 400
 
-    # Clean HTML — strip noise, keep readable text
     soup = BeautifulSoup(resp.text, 'html.parser')
     for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript', 'iframe']):
         tag.decompose()
     page_text = soup.get_text(separator='\n', strip=True)
-    page_text = re.sub(r'\n{3,}', '\n\n', page_text)[:14000]  # ~3500 tokens
+    page_text = re.sub(r'\n{3,}', '\n\n', page_text)[:14000]
 
     if len(page_text) < 100:
         return jsonify({'error': 'Page appears to be empty or JavaScript-rendered — try a static people-page URL'}), 400
 
-    # Extract contacts with Claude
     client = anthropic.Anthropic()
     extraction_prompt = f"""Extract all researcher or team member contact details from this webpage text.
 
@@ -354,7 +375,6 @@ Page text:
             messages=[{'role': 'user', 'content': extraction_prompt}]
         )
         raw = response.content[0].text.strip()
-        # Strip markdown fences if present
         raw = re.sub(r'^```(?:json)?\s*', '', raw)
         raw = re.sub(r'\s*```$', '', raw)
         contacts = json.loads(raw)
@@ -366,7 +386,6 @@ Page text:
     if not isinstance(contacts, list):
         contacts = []
 
-    # Normalise fields
     clean = []
     for c in contacts:
         if not isinstance(c, dict):

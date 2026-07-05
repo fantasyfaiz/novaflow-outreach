@@ -368,6 +368,19 @@
       white-space: nowrap; display: flex; align-items: center; gap: 5px;
     }
     .active-label .dot-green { color: #4ade80; }
+
+    /* ─── Scrape form ─────────────────────────────────────── */
+    .scrape-form { display: flex; flex-direction: column; gap: 8px; }
+    .scrape-input {
+      font-family: inherit; font-size: 11px; color: #1e1340;
+      background: rgba(124,58,237,0.04);
+      border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 8px; outline: none;
+      width: 100%; padding: 8px 12px; letter-spacing: 0.02em;
+      transition: border-color 0.15s;
+    }
+    .scrape-input:focus { border-color: rgba(124,58,237,0.5); }
+    .scrape-input::placeholder { color: #c4b5fd; }
   </style>
 </head>
 <body>
@@ -536,6 +549,23 @@
                     <div class="p-desc">Festival of Genomics &middot; 45 contacts</div>
                   </div>
                 </button>
+
+                <div class="section-label" style="margin-top:14px;">or scrape a page</div>
+                <div class="scrape-form">
+                  <input type="url" id="scrape-url" class="scrape-input"
+                         placeholder="https://lab.university.edu/people"
+                         onkeydown="if(event.key==='Enter') scrapeContacts()">
+                  <input type="text" id="scrape-institution" class="scrape-input"
+                         placeholder="Institution name (optional)"
+                         onkeydown="if(event.key==='Enter') scrapeContacts()">
+                  <button class="preset-btn" id="btn-scrape" onclick="scrapeContacts()">
+                    <span class="p-icon">⟳</span>
+                    <div>
+                      <div class="p-name">scrape contacts</div>
+                      <div class="p-desc" id="scrape-status">fetch names, emails &amp; titles from URL</div>
+                    </div>
+                  </button>
+                </div>
               </div>
 
             </div>
@@ -844,6 +874,40 @@ async function handleFile(file) {
     dropzone.classList.remove('uploading');
     document.getElementById('dz-main-text').textContent = 'drag & drop .csv';
     fileInput.value = '';
+  }
+}
+
+async function scrapeContacts() {
+  const url         = document.getElementById('scrape-url').value.trim();
+  const institution = document.getElementById('scrape-institution').value.trim();
+  if (!url) { showUploadError('Enter a URL to scrape.'); return; }
+
+  const btn      = document.getElementById('btn-scrape');
+  const statusEl = document.getElementById('scrape-status');
+  btn.disabled   = true;
+  statusEl.textContent = 'fetching & extracting…';
+
+  try {
+    const data = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, institution })
+    }).then(r => r.json());
+
+    if (data.error) {
+      showUploadError(data.error);
+    } else if (!data.contacts || data.contacts.length === 0) {
+      showUploadError('No contacts found on that page. Try a direct faculty/people URL.');
+    } else {
+      contacts = data.contacts;
+      total    = contacts.length;
+      showUploadPreview(total, data.note);
+    }
+  } catch {
+    showUploadError('Network error. Try again.');
+  } finally {
+    btn.disabled         = false;
+    statusEl.textContent = 'fetch names, emails & titles from URL';
   }
 }
 
