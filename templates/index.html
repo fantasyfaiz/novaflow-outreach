@@ -390,11 +390,16 @@
                 <div class="mode-btn-desc">Follow up with contacts from an event</div>
               </button>
             </div>
-            <div style="margin-top:10px; display:flex;">
-              <button class="mode-btn" onclick="showTracker()" style="flex:0 0 calc(50% - 7px);">
+            <div class="mode-btns" style="margin-top:10px;">
+              <button class="mode-btn" onclick="showTracker()">
                 <span class="mode-btn-icon">◈</span>
                 <div class="mode-btn-name">Outreach Tracker <span class="tracker-count-badge" id="tracker-badge">0</span></div>
                 <div class="mode-btn-desc">View everyone we've reached out to</div>
+              </button>
+              <button class="mode-btn" onclick="showScraperScreen()">
+                <span class="mode-btn-icon">⌕</span>
+                <div class="mode-btn-name">Web Scraper</div>
+                <div class="mode-btn-desc">Import contacts from a lab or institution page</div>
               </button>
             </div>
           </div>
@@ -413,6 +418,34 @@
             <div class="tracker-list" id="tracker-list">
               <div class="tracker-empty">no contacts sent yet.</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ SCRAPER SCREEN ═══════════════════════════════════ -->
+      <div id="screen-scraper" style="display:none; flex-direction:column; gap:28px; flex:1;">
+        <div>
+          <span class="back-link" onclick="hideScraperScreen()">← mode</span>
+        </div>
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">scrape from web</div>
+            <div class="scraper-row">
+              <input type="text" id="scraper-input" class="scraper-input"
+                     placeholder="lab page URL or institution name"
+                     onkeydown="if(event.key==='Enter') runScraper()">
+              <button class="scraper-btn" id="scraper-btn" onclick="runScraper()">▸ scrape()</button>
+            </div>
+            <div class="scraper-status" id="scraper-status"></div>
+          </div>
+        </div>
+        <div class="row" id="scraper-preview-row" style="display:none;">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="preview-count" id="scraper-preview-count"></div>
+            <div class="preview-note"  id="scraper-preview-note"></div>
+            <button class="begin-btn" onclick="beginOutreach()">▸ begin outreach()</button>
           </div>
         </div>
       </div>
@@ -486,20 +519,6 @@
               </div>
 
             </div>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="row-arrow">▸</div>
-          <div class="row-body">
-            <div class="section-label">or scrape from web</div>
-            <div class="scraper-row">
-              <input type="text" id="scraper-input" class="scraper-input"
-                     placeholder="lab page URL or institution name"
-                     onkeydown="if(event.key==='Enter') runScraper()">
-              <button class="scraper-btn" id="scraper-btn" onclick="runScraper()">▸ scrape()</button>
-            </div>
-            <div class="scraper-status" id="scraper-status"></div>
           </div>
         </div>
 
@@ -825,9 +844,26 @@ async function loadPreset() {
 function beginOutreach() { switchToEmail(); }
 
 /* ── Web scraper ────────────────────────────────────────────── */
+function showScraperScreen() {
+  currentMode = 'researcher';
+  document.getElementById('screen-mode').style.display    = 'none';
+  document.getElementById('screen-scraper').style.display = 'flex';
+}
+
+function hideScraperScreen() {
+  document.getElementById('scraper-input').value          = '';
+  document.getElementById('scraper-status').style.display = 'none';
+  document.getElementById('scraper-preview-row').style.display = 'none';
+  contacts = []; total = 0;
+  document.getElementById('contact-count').textContent = '—';
+  document.getElementById('screen-scraper').style.display = 'none';
+  document.getElementById('screen-mode').style.display    = 'flex';
+  currentMode = null;
+}
+
 async function runScraper() {
-  const input = document.getElementById('scraper-input');
-  const btn   = document.getElementById('scraper-btn');
+  const input  = document.getElementById('scraper-input');
+  const btn    = document.getElementById('scraper-btn');
   const status = document.getElementById('scraper-status');
   const raw = input.value.trim();
   if (!raw) return;
@@ -836,9 +872,10 @@ async function runScraper() {
   const payload = isUrl ? { url: raw } : { query: raw };
 
   btn.disabled = true;
-  status.className = 'scraper-status loading';
+  document.getElementById('scraper-preview-row').style.display = 'none';
+  status.className     = 'scraper-status loading';
   status.style.display = 'block';
-  status.textContent = '⧖  scraping page...';
+  status.textContent   = '⧖  scraping page...';
 
   try {
     const data = await fetch('/api/scrape', {
@@ -855,8 +892,10 @@ async function runScraper() {
       total    = contacts.length;
       status.className = 'scraper-status success';
       status.textContent = `✓  ${data.note}`;
-      document.getElementById('contact-count').textContent = total;
-      showUploadPreview(total, data.note);
+      document.getElementById('contact-count').textContent    = total;
+      document.getElementById('scraper-preview-count').textContent = `✓  ${total} contacts ready`;
+      document.getElementById('scraper-preview-note').textContent  = data.note;
+      document.getElementById('scraper-preview-row').style.display = 'flex';
     }
   } catch {
     status.className = 'scraper-status error';
@@ -867,9 +906,10 @@ async function runScraper() {
 }
 
 function switchToEmail() {
-  document.getElementById('screen-upload').style.display = 'none';
-  document.getElementById('screen-email').style.display  = 'flex';
-  document.getElementById('email-subject').textContent   = getSubject();
+  document.getElementById('screen-upload').style.display  = 'none';
+  document.getElementById('screen-scraper').style.display = 'none';
+  document.getElementById('screen-email').style.display   = 'flex';
+  document.getElementById('email-subject').textContent    = getSubject();
   loadContact(0);
 }
 
