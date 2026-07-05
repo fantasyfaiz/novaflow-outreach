@@ -242,6 +242,26 @@
     .email-box::-webkit-scrollbar-thumb { background: rgba(109,40,217,0.25); border-radius: 4px; }
     .placeholder { color: #c4b5fd; font-style: italic; }
 
+    .followup-badge {
+      display: inline-block;
+      font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 999px;
+      background: rgba(251,146,60,0.15); border: 1px solid rgba(251,146,60,0.35);
+      color: #c2410c; vertical-align: middle; flex-shrink: 0;
+    }
+    #btn-draft-followup {
+      background: rgba(251,146,60,0.1); border-color: rgba(251,146,60,0.3); color: #c2410c;
+    }
+    #btn-draft-followup:not(:disabled):hover {
+      background: rgba(251,146,60,0.2); border-color: rgba(251,146,60,0.55);
+    }
+    #btn-mark-replied {
+      background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.2); color: #059669;
+    }
+    #btn-mark-replied:hover {
+      background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.4);
+    }
+
     .spinner {
       display: none; width: 14px; height: 14px;
       border: 1.5px solid rgba(109,40,217,0.2); border-top-color: #7c3aed;
@@ -458,7 +478,10 @@
           <div class="row">
             <div class="row-arrow">▸</div>
             <div class="row-body">
-              <div class="contact-name" id="contact-name">loading...</div>
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:5px; flex-wrap:wrap;">
+                <div class="contact-name" id="contact-name" style="margin-bottom:0">loading...</div>
+                <span id="followup-badge" class="followup-badge" style="display:none">follow-up due</span>
+              </div>
               <div class="contact-line" id="contact-title"></div>
               <div class="contact-line" id="contact-company"></div>
               <input type="email" class="contact-email-input" id="contact-email"
@@ -487,6 +510,10 @@
                 <button class="act-btn" id="btn-generate" onclick="generateEmail()" disabled>▸ generate()</button>
                 <button class="act-btn" id="btn-approve"  onclick="approve()"       disabled>▸ send()</button>
                 <button class="act-btn" id="btn-reject"   onclick="reject()">▸ next()</button>
+              </div>
+              <div class="action-row" id="followup-action-row" style="display:none; margin-top:6px;">
+                <button class="act-btn" id="btn-draft-followup" onclick="draftFollowup()">▸ followup()</button>
+                <button class="act-btn" id="btn-mark-replied"   onclick="markReplied()">▸ replied()</button>
               </div>
             </div>
           </div>
@@ -741,9 +768,94 @@ let currentContact = null;
 let currentEmail   = null;
 let currentSender  = null;
 let total          = 0;
+let followupMode   = false;
+
+/* ── Follow-up tracking (localStorage) ─────────────────────── */
+const SENT_KEY      = 'novaflow_outreach_sent';
+const FOLLOWUP_DAYS = 4;
+
+function getSentData() {
+  try { return JSON.parse(localStorage.getItem(SENT_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveSentData(data) { localStorage.setItem(SENT_KEY, JSON.stringify(data)); }
+
+function markSent(email) {
+  if (!email) return;
+  const data = getSentData();
+  data[email] = { sentAt: Date.now(), replied: false };
+  saveSentData(data);
+}
+
+function markReplied() {
+  if (!currentContact) return;
+  const data  = getSentData();
+  const entry = data[currentContact.email];
+  if (entry) { entry.replied = true; saveSentData(data); }
+  updateFollowupUI(currentContact);
+}
+
+function isFollowupDue(email) {
+  if (!email) return false;
+  const entry = getSentData()[email];
+  if (!entry || entry.replied) return false;
+  return (Date.now() - entry.sentAt) / 86400000 > FOLLOWUP_DAYS;
+}
+
+function updateFollowupUI(contact) {
+  const due = !!(contact && isFollowupDue(contact.email));
+  document.getElementById('followup-badge').style.display      = due ? 'inline-block' : 'none';
+  document.getElementById('followup-action-row').style.display = due ? 'flex'         : 'none';
+}
+
+function buildFollowupEmail(contact, para, senderKey) {
+  const sender  = SENDERS[senderKey];
+  const closing = pickClosing(contact.job_title, senderKey);
+  let body = `Hello ${contact.first_name},\n\n`;
+  body += `Wanted to briefly follow up on my previous note about Novaflow.\n\n`;
+  body += `${para}\n\n`;
+  if (sender.calendarLine) body += `Feel free to book a time to chat here: ${CALENDAR_URL} or just reply and we can figure out next steps over email.\n\n`;
+  body += `${closing}\n\n${sender.signOff}`;
+  return body;
+}
+
+async function draftFollowup() {
+  if (!currentSender || !currentContact) return;
+  const btn = document.getElementById('btn-draft-followup');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '... generating';
+
+  try {
+    const data = await fetch('/api/generate-followup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact: currentContact }),
+    }).then(r => r.json());
+
+    if (data.error) {
+      document.getElementById('email-preview').innerHTML =
+        `<span style="color:#f87171">error: ${data.error}</span>`;
+      btn.textContent = orig; btn.disabled = false;
+      return;
+    }
+
+    followupMode = true;
+    currentEmail = buildFollowupEmail(currentContact, data.para, currentSender);
+    document.getElementById('email-preview').textContent = currentEmail;
+    document.getElementById('btn-approve').disabled = false;
+    btn.textContent = '▸ regenerate followup()';
+    btn.disabled = false;
+  } catch {
+    document.getElementById('email-preview').innerHTML =
+      '<span style="color:#f87171">network error. try again.</span>';
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
 
 function selectSender(key) {
   currentSender = key;
+  followupMode  = false;
   document.querySelectorAll('.sender-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.sender === key)
   );
@@ -770,6 +882,7 @@ function updateProgress(idx) {
 function loadContact(idx) {
   currentIdx     = idx;
   currentEmail   = null;
+  followupMode   = false;
   currentContact = contacts[idx] || null;
 
   document.getElementById('btn-approve').disabled  = true;
@@ -778,6 +891,8 @@ function loadContact(idx) {
   document.getElementById('btn-prev').disabled = (idx <= 0);
 
   updateProgress(idx);
+
+  updateFollowupUI(null);
 
   if (!currentContact) {
     document.getElementById('main-view').style.display = 'none';
@@ -809,6 +924,7 @@ function loadContact(idx) {
       (currentSender ? 'click generate() to draft.' : 'select a sender first.') +
       '</span>';
   }
+  updateFollowupUI(currentContact);
 }
 
 async function generateEmail() {
@@ -851,10 +967,14 @@ async function generateEmail() {
 
 function approve() {
   if (!currentEmail) return;
-  const to      = encodeURIComponent(document.getElementById('contact-email').value.trim());
-  const subject = encodeURIComponent(getSubject());
+  const toRaw   = document.getElementById('contact-email').value.trim();
+  const to      = encodeURIComponent(toRaw);
+  const subject = encodeURIComponent(followupMode ? 'Re: ' + getSubject() : getSubject());
   const body    = encodeURIComponent(currentEmail);
-  if (to) window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+  if (to) {
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+    if (!followupMode) markSent(toRaw);
+  }
   loadContact(currentIdx + 1);
 }
 
@@ -865,6 +985,8 @@ function backToUpload() {
   // Clear state
   contacts = []; paraCache = {}; currentIdx = 0;
   currentContact = null; currentEmail = null; total = 0;
+  followupMode = false;
+  updateFollowupUI(null);
 
   // Reset upload UI
   document.getElementById('upload-feedback-row').style.display = 'none';
