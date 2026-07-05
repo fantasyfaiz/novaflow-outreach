@@ -61,6 +61,43 @@ def parse_csv_stream(stream):
     return contacts, note
 
 
+def generate_followup_paragraph(first_name, company, job_title):
+    client = anthropic.Anthropic()
+    prompt = f"""Write exactly ONE short paragraph (2-3 sentences) for a follow-up outreach email.
+
+Context: This is a follow-up to an earlier cold outreach email about Novaflow (a bioinformatics/genomics analysis platform, YC-backed) sent about a week ago with no response.
+
+Recipient:
+- Name: {first_name}
+- Company: {company}
+- Job Title: {job_title}
+
+About Novaflow:
+- Bioinformatics analysis platform that takes raw genomic/sequencing data and produces results fast
+- YC-backed, used at Harvard and Johns Hopkins
+- Offering to analyze the recipient's own dataset for free
+
+Requirements:
+- Briefly acknowledge this is a follow-up, without being pushy or apologetic
+- Keep the free dataset offer visible but light
+- Sound human and genuine
+- Do not start with "I"
+- Do not use em dashes
+- Do not include any greeting or sign-off
+- Output only the paragraph text"""
+
+    response = client.messages.create(
+        model="claude-opus-4-8",
+        max_tokens=200,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": prompt}]
+    )
+    for block in response.content:
+        if block.type == "text":
+            return block.text.strip()
+    return ""
+
+
 def generate_paragraph(first_name, company, job_title, conference_name='', conference_location=''):
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
     conference_line = ''
@@ -207,6 +244,23 @@ def generate_email():
             contact.get('job_title',  ''),
             data.get('conference_name', ''),
             data.get('conference_location', ''),
+        )
+        return jsonify({'para': para})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/generate-followup', methods=['POST'])
+def generate_followup_email():
+    data    = request.json or {}
+    contact = data.get('contact')
+    if not contact:
+        return jsonify({'error': 'contact is required'}), 400
+    try:
+        para = generate_followup_paragraph(
+            contact.get('first_name', ''),
+            contact.get('company',    ''),
+            contact.get('job_title',  ''),
         )
         return jsonify({'para': para})
     except Exception as e:
