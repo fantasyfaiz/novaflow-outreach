@@ -1,11 +1,19 @@
 import os
 import csv
 import io
+import json
+import urllib.request
+import urllib.error
+from datetime import datetime, timedelta, timezone
 import anthropic
 from flask import Flask, render_template, jsonify, request
 
 BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FOG_CSV_PATH = os.path.join(BASE_DIR, 'data', 'fog_booth_only.csv')
+
+SUPABASE_URL   = os.environ.get('SUPABASE_URL', '').rstrip('/')
+SUPABASE_KEY   = os.environ.get('SUPABASE_KEY', '')
+FOLLOW_UP_DAYS = int(os.environ.get('FOLLOW_UP_DAYS', '7'))
 
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'templates'),
@@ -91,11 +99,64 @@ Requirements:
     return ""
 
 
+def save_contact_to_supabase(contact, mode):
+    """Upsert one contact into the Supabase `contacts` table.
+    Returns the inserted/updated row dict. Raises RuntimeError on failure."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError('Supabase not configured (set SUPABASE_URL and SUPABASE_KEY)')
+
+    now      = datetime.now(timezone.utc)
+    due_date = (now + timedelta(days=FOLLOW_UP_DAYS)).date()
+    payload  = {
+        'first_name':     contact.get('first_name', '').strip(),
+        'last_name':      contact.get('last_name',  '').strip(),
+        'email':          contact.get('email',      '').strip().lower(),
+        'company':        contact.get('company',    '').strip(),
+        'job_title':      contact.get('job_title',  '').strip(),
+        'date_contacted': now.isoformat(),
+        'email_status':   'sent',
+        'mode':           'conference' if mode == 'conference' else 'researcher',
+        'follow_up_due':  due_date.isoformat(),
+    }
+
+    # on_conflict on the lower(email) unique index — re-sends update the row.
+    url  = f'{SUPABASE_URL}/rest/v1/contacts?on_conflict=email'
+    body = json.dumps([payload]).encode('utf-8')
+    req  = urllib.request.Request(url, data=body, method='POST', headers={
+        'apikey':        SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'Content-Type':  'application/json',
+        'Prefer':        'resolution=merge-duplicates,return=representation',
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            rows = json.loads(resp.read().decode('utf-8') or '[]')
+            return rows[0] if rows else payload
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode('utf-8', 'replace')
+        raise RuntimeError(f'Supabase {e.code}: {detail}')
+    except urllib.error.URLError as e:
+        raise RuntimeError(f'Supabase unreachable: {e.reason}')
+
+
 # ── Routes ────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/api/save-contact', methods=['POST'])
+def save_contact():
+    data    = request.json or {}
+    contact = data.get('contact')
+    if not contact or not contact.get('email', '').strip():
+        return jsonify({'error': 'contact with email is required'}), 400
+    try:
+        row = save_contact_to_supabase(contact, data.get('mode', 'researcher'))
+        return jsonify({'saved': True, 'contact': row})
+    except RuntimeError as e:
+        return jsonify({'error': str(e)}), 502
 
 
 @app.route('/api/upload', methods=['POST'])
