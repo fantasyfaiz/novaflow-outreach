@@ -99,6 +99,67 @@
     .mode-btn-name { font-size: 13px; font-weight: 600; color: #4c1d95; }
     .mode-btn-desc { font-size: 10px; color: #8b7bb8; letter-spacing: 0.03em; line-height: 1.6; }
 
+    /* ─── TRACKER SCREEN ────────────────────────────────── */
+    #screen-tracker { display: none; flex-direction: column; gap: 20px; flex: 1; }
+
+    .tracker-empty {
+      font-size: 11px; color: #b0a8cc; font-style: italic; letter-spacing: 0.03em;
+      padding: 20px 0;
+    }
+    .tracker-list { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: rgba(109,40,217,0.2) transparent;
+    }
+    .tracker-list::-webkit-scrollbar { width: 4px; }
+    .tracker-list::-webkit-scrollbar-track { background: transparent; }
+    .tracker-list::-webkit-scrollbar-thumb { background: rgba(109,40,217,0.25); border-radius: 4px; }
+    .tracker-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 8px;
+      border: 1px solid rgba(124,58,237,0.12);
+      background: rgba(124,58,237,0.03);
+    }
+    .tracker-num { font-size: 10px; color: #b0a8cc; letter-spacing: 0.06em; min-width: 18px; flex-shrink: 0; font-family: 'Martian Mono', monospace; }
+    .tracker-body { flex: 1; min-width: 0; }
+    .tracker-name { font-size: 12px; font-weight: 600; color: #1e1340; }
+    .tracker-meta { font-size: 10px; color: #8b7bb8; letter-spacing: 0.03em; line-height: 1.6; font-family: 'Martian Mono', monospace; }
+    .tracker-right { text-align: right; flex-shrink: 0; }
+    .tracker-mode { font-size: 10px; color: #7c3aed; letter-spacing: 0.04em; font-family: 'Martian Mono', monospace; }
+    .tracker-time { font-size: 10px; color: #b0a8cc; letter-spacing: 0.03em; font-family: 'Martian Mono', monospace; }
+    .tracker-count-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(124,58,237,0.12); color: #7c3aed;
+      border-radius: 999px; font-size: 10px; padding: 1px 7px;
+      letter-spacing: 0.04em; font-family: 'Martian Mono', monospace;
+      margin-left: 6px;
+    }
+
+    /* ─── SCRAPER ────────────────────────────────────────── */
+    .scraper-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+    .scraper-input {
+      flex: 1; font-family: 'Martian Mono', monospace; font-size: 11px; color: #1e1340;
+      background: rgba(124,58,237,0.04); border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 8px; outline: none; padding: 9px 13px; letter-spacing: 0.02em;
+      transition: border-color 0.15s;
+    }
+    .scraper-input:focus { border-color: rgba(124,58,237,0.5); }
+    .scraper-input::placeholder { color: #c4b5fd; }
+    .scraper-btn {
+      font-family: inherit; font-size: 11px; letter-spacing: 0.05em;
+      padding: 9px 16px; border-radius: 8px;
+      border: 1px solid rgba(109,40,217,0.35); background: rgba(109,40,217,0.08); color: #6d28d9;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .scraper-btn:hover { background: rgba(109,40,217,0.16); border-color: rgba(124,58,237,0.55); }
+    .scraper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .scraper-status {
+      display: none; font-size: 11px; letter-spacing: 0.02em;
+      padding: 10px 14px; border-radius: 7px; margin-top: 8px;
+      font-family: 'Martian Mono', monospace;
+    }
+    .scraper-status.error   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #dc2626; }
+    .scraper-status.success { background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.18); color: #059669; }
+    .scraper-status.loading { background: rgba(109,40,217,0.05); border: 1px solid rgba(109,40,217,0.15); color: #7c3aed; }
+
     /* ─── CONF INFO SCREEN ────────────────────────────────── */
     #screen-conf-info { display: none; flex-direction: column; gap: 28px; flex: 1; }
 
@@ -349,6 +410,29 @@
                 <div class="mode-btn-desc">Follow up with contacts from an event</div>
               </button>
             </div>
+            <div style="margin-top:10px; display:flex;">
+              <button class="mode-btn" onclick="showTracker()" style="flex:0 0 calc(50% - 7px);">
+                <span class="mode-btn-icon">◈</span>
+                <div class="mode-btn-name">Outreach Tracker <span class="tracker-count-badge" id="tracker-badge">0</span></div>
+                <div class="mode-btn-desc">View everyone we've reached out to</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TRACKER SCREEN ═══════════════════════════════════ -->
+      <div id="screen-tracker">
+        <div>
+          <span class="back-link" onclick="hideTracker()">← mode</span>
+        </div>
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">outreach tracker — <span id="tracker-total">0</span> sent</div>
+            <div class="tracker-list" id="tracker-list">
+              <div class="tracker-empty">no contacts sent yet.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -422,6 +506,20 @@
               </div>
 
             </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">or scrape from web</div>
+            <div class="scraper-row">
+              <input type="text" id="scraper-input" class="scraper-input"
+                     placeholder="lab page URL or institution name"
+                     onkeydown="if(event.key==='Enter') runScraper()">
+              <button class="scraper-btn" id="scraper-btn" onclick="runScraper()">▸ scrape()</button>
+            </div>
+            <div class="scraper-status" id="scraper-status"></div>
           </div>
         </div>
 
@@ -753,6 +851,48 @@ async function loadPreset() {
 
 function beginOutreach() { switchToEmail(); }
 
+/* ── Web scraper ────────────────────────────────────────────── */
+async function runScraper() {
+  const input = document.getElementById('scraper-input');
+  const btn   = document.getElementById('scraper-btn');
+  const status = document.getElementById('scraper-status');
+  const raw = input.value.trim();
+  if (!raw) return;
+
+  const isUrl = /^https?:\/\//i.test(raw) || raw.includes('.');
+  const payload = isUrl ? { url: raw } : { query: raw };
+
+  btn.disabled = true;
+  status.className = 'scraper-status loading';
+  status.style.display = 'block';
+  status.textContent = '⧖  scraping page...';
+
+  try {
+    const data = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json());
+
+    if (data.error) {
+      status.className = 'scraper-status error';
+      status.textContent = '✕  ' + data.error;
+    } else {
+      contacts = data.contacts;
+      total    = contacts.length;
+      status.className = 'scraper-status success';
+      status.textContent = `✓  ${data.note}`;
+      document.getElementById('contact-count').textContent = total;
+      showUploadPreview(total, data.note);
+    }
+  } catch {
+    status.className = 'scraper-status error';
+    status.textContent = '✕  Network error — try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function switchToEmail() {
   document.getElementById('screen-upload').style.display = 'none';
   document.getElementById('screen-email').style.display  = 'flex';
@@ -975,11 +1115,65 @@ function approve() {
     window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
     if (!followupMode) markSent(toRaw);
   }
+  logOutreach(currentContact, toRaw, currentSender);
   loadContact(currentIdx + 1);
 }
 
 function prevContact() { if (currentIdx > 0) loadContact(currentIdx - 1); }
 function reject()       { loadContact(currentIdx + 1); }
+
+/* ── Outreach Tracker ─────────────────────────────────────── */
+let outreachLog = [];
+
+function logOutreach(contact, email, sender) {
+  outreachLog.push({
+    name:       `${contact.first_name} ${contact.last_name}`,
+    company:    contact.company,
+    title:      contact.job_title,
+    email:      email,
+    mode:       currentMode,
+    conference: conferenceName || null,
+    sender:     sender,
+    ts:         new Date(),
+  });
+  document.getElementById('tracker-badge').textContent = outreachLog.length;
+  document.getElementById('tracker-total').textContent = outreachLog.length;
+  renderTracker();
+}
+
+function renderTracker() {
+  const list = document.getElementById('tracker-list');
+  if (outreachLog.length === 0) {
+    list.innerHTML = '<div class="tracker-empty">no contacts sent yet.</div>';
+    return;
+  }
+  list.innerHTML = outreachLog.map((e, i) => {
+    const modeLabel = e.mode === 'conference' ? `✦ ${e.conference}` : '⊙ researcher';
+    const time = e.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="tracker-row">
+      <div class="tracker-num">${i + 1}</div>
+      <div class="tracker-body">
+        <div class="tracker-name">${e.name}</div>
+        <div class="tracker-meta">${e.title} · ${e.company}</div>
+        <div class="tracker-meta">${e.email}</div>
+      </div>
+      <div class="tracker-right">
+        <div class="tracker-mode">${modeLabel}</div>
+        <div class="tracker-time">${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showTracker() {
+  document.getElementById('screen-mode').style.display    = 'none';
+  document.getElementById('screen-tracker').style.display = 'flex';
+}
+
+function hideTracker() {
+  document.getElementById('screen-tracker').style.display = 'none';
+  document.getElementById('screen-mode').style.display    = 'flex';
+}
 
 function backToUpload() {
   // Clear state

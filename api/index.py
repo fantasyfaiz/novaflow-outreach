@@ -1,7 +1,11 @@
 import os
 import csv
 import io
+import json
+import re
 import anthropic
+import requests
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, jsonify, request
 
 BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -201,6 +205,132 @@ def generate_followup_email():
         return jsonify({'para': para})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/scrape', methods=['POST'])
+def scrape_contacts():
+    data  = request.json or {}
+    url   = data.get('url', '').strip()
+    query = data.get('query', '').strip()
+
+    if not url and not query:
+        return jsonify({'error': 'Provide a URL or institution name'}), 400
+
+    # If institution name given, try common people-page patterns
+    if not url and query:
+        slug = re.sub(r'[^a-z0-9]', '', query.lower())
+        candidates = [
+            f'https://www.{slug}.edu/people',
+            f'https://www.{slug}.org/team',
+            f'https://www.{slug}.com/team',
+        ]
+        for candidate in candidates:
+            try:
+                r = requests.get(candidate, timeout=8,
+                                 headers={'User-Agent': 'Mozilla/5.0 (compatible; research-scraper/1.0)'})
+                if r.status_code == 200:
+                    url = candidate
+                    break
+            except Exception:
+                continue
+        if not url:
+            return jsonify({'error': f'Could not find a people page for "{query}". Try pasting the URL directly.'}), 400
+
+    # Normalise URL
+    if not url.startswith('http'):
+        url = 'https://' + url
+
+    # Fetch page
+    try:
+        resp = requests.get(
+            url, timeout=15,
+            headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'},
+            allow_redirects=True,
+        )
+        resp.raise_for_status()
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Page took too long to load (>15s)'}), 400
+    except requests.exceptions.HTTPError as e:
+        return jsonify({'error': f'Page returned {e.response.status_code}'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Could not fetch page: {str(e)}'}), 400
+
+    # Clean HTML — strip noise, keep readable text
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript', 'iframe']):
+        tag.decompose()
+    page_text = soup.get_text(separator='\n', strip=True)
+    page_text = re.sub(r'\n{3,}', '\n\n', page_text)[:14000]  # ~3500 tokens
+
+    if len(page_text) < 100:
+        return jsonify({'error': 'Page appears to be empty or JavaScript-rendered — try a static people-page URL'}), 400
+
+    # Extract contacts with Claude
+    client = anthropic.Anthropic()
+    extraction_prompt = f"""Extract all researcher or team member contact details from this webpage text.
+
+Return ONLY a valid JSON array. Each element must have exactly these fields:
+  "first_name"  – string (required)
+  "last_name"   – string (required)
+  "email"       – string (empty string "" if not found)
+  "company"     – string (institution or lab name, infer from context)
+  "job_title"   – string (their role, e.g. "PhD Student", "Principal Investigator")
+
+Rules:
+- Only include real named people with at least a name and title
+- Ignore nav links, generic department names, and non-person entries
+- If the page has no clear people listings return []
+- Output the JSON array only — no markdown, no explanation
+
+Page URL: {url}
+
+Page text:
+{page_text}"""
+
+    try:
+        response = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=2000,
+            messages=[{'role': 'user', 'content': extraction_prompt}]
+        )
+        raw = response.content[0].text.strip()
+        # Strip markdown fences if present
+        raw = re.sub(r'^```(?:json)?\s*', '', raw)
+        raw = re.sub(r'\s*```$', '', raw)
+        contacts = json.loads(raw)
+    except json.JSONDecodeError:
+        return jsonify({'error': 'Could not parse contacts from page — try a more structured people page'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Extraction error: {str(e)}'}), 500
+
+    if not isinstance(contacts, list):
+        contacts = []
+
+    # Normalise fields
+    clean = []
+    for c in contacts:
+        if not isinstance(c, dict):
+            continue
+        first = str(c.get('first_name', '')).strip()
+        last  = str(c.get('last_name',  '')).strip()
+        if not first and not last:
+            continue
+        clean.append({
+            'first_name': first,
+            'last_name':  last,
+            'email':      str(c.get('email',     '')).strip(),
+            'company':    str(c.get('company',   '')).strip(),
+            'job_title':  str(c.get('job_title', '')).strip(),
+        })
+
+    if not clean:
+        return jsonify({'error': 'No researchers found on that page — try a lab people/team page'}), 400
+
+    return jsonify({
+        'contacts': clean,
+        'note': f'{len(clean)} researchers scraped from {url}',
+        'source_url': url,
+    })
 
 
 if __name__ == '__main__':
