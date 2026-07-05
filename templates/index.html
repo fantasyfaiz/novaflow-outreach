@@ -99,6 +99,40 @@
     .mode-btn-name { font-size: 13px; font-weight: 600; color: #4c1d95; }
     .mode-btn-desc { font-size: 10px; color: #8b7bb8; letter-spacing: 0.03em; line-height: 1.6; }
 
+    /* ─── TRACKER SCREEN ────────────────────────────────── */
+    #screen-tracker { display: none; flex-direction: column; gap: 20px; flex: 1; }
+
+    .tracker-empty {
+      font-size: 11px; color: #b0a8cc; font-style: italic; letter-spacing: 0.03em;
+      padding: 20px 0;
+    }
+    .tracker-list { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: rgba(109,40,217,0.2) transparent;
+    }
+    .tracker-list::-webkit-scrollbar { width: 4px; }
+    .tracker-list::-webkit-scrollbar-track { background: transparent; }
+    .tracker-list::-webkit-scrollbar-thumb { background: rgba(109,40,217,0.25); border-radius: 4px; }
+    .tracker-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 14px; border-radius: 8px;
+      border: 1px solid rgba(124,58,237,0.12);
+      background: rgba(124,58,237,0.03);
+    }
+    .tracker-num { font-size: 10px; color: #b0a8cc; letter-spacing: 0.06em; min-width: 18px; flex-shrink: 0; font-family: 'Martian Mono', monospace; }
+    .tracker-body { flex: 1; min-width: 0; }
+    .tracker-name { font-size: 12px; font-weight: 600; color: #1e1340; }
+    .tracker-meta { font-size: 10px; color: #8b7bb8; letter-spacing: 0.03em; line-height: 1.6; font-family: 'Martian Mono', monospace; }
+    .tracker-right { text-align: right; flex-shrink: 0; }
+    .tracker-mode { font-size: 10px; color: #7c3aed; letter-spacing: 0.04em; font-family: 'Martian Mono', monospace; }
+    .tracker-time { font-size: 10px; color: #b0a8cc; letter-spacing: 0.03em; font-family: 'Martian Mono', monospace; }
+    .tracker-count-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(124,58,237,0.12); color: #7c3aed;
+      border-radius: 999px; font-size: 10px; padding: 1px 7px;
+      letter-spacing: 0.04em; font-family: 'Martian Mono', monospace;
+      margin-left: 6px;
+    }
+
     /* ─── CONF INFO SCREEN ────────────────────────────────── */
     #screen-conf-info { display: none; flex-direction: column; gap: 28px; flex: 1; }
 
@@ -328,6 +362,29 @@
                 <div class="mode-btn-name">Conference Follow-up</div>
                 <div class="mode-btn-desc">Follow up with contacts from an event</div>
               </button>
+            </div>
+            <div style="margin-top:10px; display:flex;">
+              <button class="mode-btn" onclick="showTracker()" style="flex:0 0 calc(50% - 7px);">
+                <span class="mode-btn-icon">◈</span>
+                <div class="mode-btn-name">Outreach Tracker <span class="tracker-count-badge" id="tracker-badge">0</span></div>
+                <div class="mode-btn-desc">View everyone we've reached out to</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ TRACKER SCREEN ═══════════════════════════════════ -->
+      <div id="screen-tracker">
+        <div>
+          <span class="back-link" onclick="hideTracker()">← mode</span>
+        </div>
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">outreach tracker — <span id="tracker-total">0</span> sent</div>
+            <div class="tracker-list" id="tracker-list">
+              <div class="tracker-empty">no contacts sent yet.</div>
             </div>
           </div>
         </div>
@@ -851,15 +908,70 @@ async function generateEmail() {
 
 function approve() {
   if (!currentEmail) return;
-  const to      = encodeURIComponent(document.getElementById('contact-email').value.trim());
+  const emailAddr = document.getElementById('contact-email').value.trim();
+  const to      = encodeURIComponent(emailAddr);
   const subject = encodeURIComponent(getSubject());
   const body    = encodeURIComponent(currentEmail);
   if (to) window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
+  logOutreach(currentContact, emailAddr, currentSender);
   loadContact(currentIdx + 1);
 }
 
 function prevContact() { if (currentIdx > 0) loadContact(currentIdx - 1); }
 function reject()       { loadContact(currentIdx + 1); }
+
+/* ── Outreach Tracker ─────────────────────────────────────── */
+let outreachLog = [];
+
+function logOutreach(contact, email, sender) {
+  outreachLog.push({
+    name:       `${contact.first_name} ${contact.last_name}`,
+    company:    contact.company,
+    title:      contact.job_title,
+    email:      email,
+    mode:       currentMode,
+    conference: conferenceName || null,
+    sender:     sender,
+    ts:         new Date(),
+  });
+  document.getElementById('tracker-badge').textContent = outreachLog.length;
+  document.getElementById('tracker-total').textContent = outreachLog.length;
+  renderTracker();
+}
+
+function renderTracker() {
+  const list = document.getElementById('tracker-list');
+  if (outreachLog.length === 0) {
+    list.innerHTML = '<div class="tracker-empty">no contacts sent yet.</div>';
+    return;
+  }
+  list.innerHTML = outreachLog.map((e, i) => {
+    const modeLabel = e.mode === 'conference' ? `✦ ${e.conference}` : '⊙ researcher';
+    const time = e.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `<div class="tracker-row">
+      <div class="tracker-num">${i + 1}</div>
+      <div class="tracker-body">
+        <div class="tracker-name">${e.name}</div>
+        <div class="tracker-meta">${e.title} · ${e.company}</div>
+        <div class="tracker-meta">${e.email}</div>
+      </div>
+      <div class="tracker-right">
+        <div class="tracker-mode">${modeLabel}</div>
+        <div class="tracker-time">${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showTracker() {
+  document.getElementById('screen-mode').style.display    = 'none';
+  document.getElementById('screen-tracker').style.display = 'flex';
+}
+
+function hideTracker() {
+  document.getElementById('screen-tracker').style.display = 'none';
+  document.getElementById('screen-mode').style.display    = 'flex';
+}
 
 function backToUpload() {
   // Clear state
