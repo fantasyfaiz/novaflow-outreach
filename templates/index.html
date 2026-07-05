@@ -133,6 +133,33 @@
       margin-left: 6px;
     }
 
+    /* ─── SCRAPER ────────────────────────────────────────── */
+    .scraper-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+    .scraper-input {
+      flex: 1; font-family: 'Martian Mono', monospace; font-size: 11px; color: #1e1340;
+      background: rgba(124,58,237,0.04); border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 8px; outline: none; padding: 9px 13px; letter-spacing: 0.02em;
+      transition: border-color 0.15s;
+    }
+    .scraper-input:focus { border-color: rgba(124,58,237,0.5); }
+    .scraper-input::placeholder { color: #c4b5fd; }
+    .scraper-btn {
+      font-family: inherit; font-size: 11px; letter-spacing: 0.05em;
+      padding: 9px 16px; border-radius: 8px;
+      border: 1px solid rgba(109,40,217,0.35); background: rgba(109,40,217,0.08); color: #6d28d9;
+      cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .scraper-btn:hover { background: rgba(109,40,217,0.16); border-color: rgba(124,58,237,0.55); }
+    .scraper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .scraper-status {
+      display: none; font-size: 11px; letter-spacing: 0.02em;
+      padding: 10px 14px; border-radius: 7px; margin-top: 8px;
+      font-family: 'Martian Mono', monospace;
+    }
+    .scraper-status.error   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #dc2626; }
+    .scraper-status.success { background: rgba(16,185,129,0.07); border: 1px solid rgba(16,185,129,0.18); color: #059669; }
+    .scraper-status.loading { background: rgba(109,40,217,0.05); border: 1px solid rgba(109,40,217,0.15); color: #7c3aed; }
+
     /* ─── CONF INFO SCREEN ────────────────────────────────── */
     #screen-conf-info { display: none; flex-direction: column; gap: 28px; flex: 1; }
 
@@ -462,6 +489,20 @@
           </div>
         </div>
 
+        <div class="row">
+          <div class="row-arrow">▸</div>
+          <div class="row-body">
+            <div class="section-label">or scrape from web</div>
+            <div class="scraper-row">
+              <input type="text" id="scraper-input" class="scraper-input"
+                     placeholder="lab page URL or institution name"
+                     onkeydown="if(event.key==='Enter') runScraper()">
+              <button class="scraper-btn" id="scraper-btn" onclick="runScraper()">▸ scrape()</button>
+            </div>
+            <div class="scraper-status" id="scraper-status"></div>
+          </div>
+        </div>
+
         <div class="row" id="upload-feedback-row" style="display:none;">
           <div class="row-arrow">▸</div>
           <div class="row-body">
@@ -782,6 +823,48 @@ async function loadPreset() {
 }
 
 function beginOutreach() { switchToEmail(); }
+
+/* ── Web scraper ────────────────────────────────────────────── */
+async function runScraper() {
+  const input = document.getElementById('scraper-input');
+  const btn   = document.getElementById('scraper-btn');
+  const status = document.getElementById('scraper-status');
+  const raw = input.value.trim();
+  if (!raw) return;
+
+  const isUrl = /^https?:\/\//i.test(raw) || raw.includes('.');
+  const payload = isUrl ? { url: raw } : { query: raw };
+
+  btn.disabled = true;
+  status.className = 'scraper-status loading';
+  status.style.display = 'block';
+  status.textContent = '⧖  scraping page...';
+
+  try {
+    const data = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(r => r.json());
+
+    if (data.error) {
+      status.className = 'scraper-status error';
+      status.textContent = '✕  ' + data.error;
+    } else {
+      contacts = data.contacts;
+      total    = contacts.length;
+      status.className = 'scraper-status success';
+      status.textContent = `✓  ${data.note}`;
+      document.getElementById('contact-count').textContent = total;
+      showUploadPreview(total, data.note);
+    }
+  } catch {
+    status.className = 'scraper-status error';
+    status.textContent = '✕  Network error — try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
 
 function switchToEmail() {
   document.getElementById('screen-upload').style.display = 'none';
