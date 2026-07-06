@@ -511,6 +511,10 @@ def auth_google():
         access_type='offline', prompt='consent',
     )
     session['oauth_state'] = state
+    # Persist PKCE verifier the library may have auto-generated
+    cv = getattr(flow.oauth2session, 'code_verifier', None)
+    if cv:
+        session['code_verifier'] = cv
     return redirect(auth_url)
 
 
@@ -519,7 +523,10 @@ def auth_callback():
     state = session.get('oauth_state') or request.args.get('state')
     flow = _make_flow(state=state)
     callback_url = request.url.replace('http://', 'https://', 1)
-    flow.fetch_token(authorization_response=callback_url)
+    flow.fetch_token(
+        authorization_response=callback_url,
+        code_verifier=session.get('code_verifier') or None,
+    )
     email = session.get('oauth_sender', '')
     if email:
         _save_token(email, flow.credentials)
