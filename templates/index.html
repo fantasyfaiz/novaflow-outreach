@@ -125,6 +125,18 @@
     .tracker-right { text-align: right; flex-shrink: 0; }
     .tracker-mode { font-size: 10px; color: #7c3aed; letter-spacing: 0.04em; font-family: 'Martian Mono', monospace; }
     .tracker-time { font-size: 10px; color: #b0a8cc; letter-spacing: 0.03em; font-family: 'Martian Mono', monospace; }
+    .tracker-actions { display: flex; align-items: center; gap: 6px; margin-left: 8px; flex-shrink: 0; }
+    .tracker-followup-btn {
+      font-size: 9px; font-family: 'Martian Mono', monospace; letter-spacing: 0.04em;
+      color: #7c3aed; border: 1px solid rgba(124,58,237,0.3); background: transparent;
+      border-radius: 4px; padding: 3px 7px; cursor: pointer; white-space: nowrap;
+    }
+    .tracker-followup-btn:hover { background: rgba(124,58,237,0.08); }
+    .tracker-delete-btn {
+      font-size: 13px; color: #c4b5e8; background: transparent; border: none;
+      cursor: pointer; line-height: 1; padding: 2px 4px; border-radius: 4px;
+    }
+    .tracker-delete-btn:hover { color: #ef4444; }
     .tracker-count-badge {
       display: inline-flex; align-items: center; justify-content: center;
       background: rgba(124,58,237,0.12); color: #7c3aed;
@@ -1396,19 +1408,58 @@ function renderTracker() {
     const time = e.ts instanceof Date && !isNaN(e.ts)
       ? e.ts.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + e.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';
-    return `<div class="tracker-row">
+    const emailSafe = encodeURIComponent(e.email);
+    return `<div class="tracker-row" id="tracker-row-${i}">
       <div class="tracker-num">${i + 1}</div>
       <div class="tracker-body">
-        <div class="tracker-name">${e.name}</div>
-        <div class="tracker-meta">${e.title} · ${e.company}</div>
+        <div class="tracker-name">${e.name || '—'}</div>
+        <div class="tracker-meta">${[e.title, e.company].filter(Boolean).join(' · ')}</div>
         <div class="tracker-meta">${e.email}</div>
       </div>
       <div class="tracker-right">
         <div class="tracker-mode">${modeLabel}</div>
         <div class="tracker-time">${time}</div>
       </div>
+      <div class="tracker-actions">
+        <button class="tracker-followup-btn" onclick="sendTrackerFollowup('${e.email}', '${(e.name||'').replace(/'/g,"\\'")}')">↩ follow up</button>
+        <button class="tracker-delete-btn" onclick="deleteTrackerContact('${e.email}', ${i})" title="Remove">✕</button>
+      </div>
     </div>`;
   }).join('');
+}
+
+async function sendTrackerFollowup(email, name) {
+  const fromEmail = document.getElementById('sender-email').value.trim() || 'faizahme@usc.edu';
+  const subject   = 'Following up!';
+  const body      = `Hello!\n\nJust wanted to bump my previous email in case it got buried! Would love to find a time to connect. Feel free to book a time here!\n\nAll the best,\nFaiz`;
+  if (gmailConnected) {
+    try {
+      const res = await fetch('/api/send-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_email: fromEmail, to_email: email, subject, body, attach_png: false }),
+      }).then(r => r.json());
+      if (res.error) { alert('Follow-up failed: ' + res.error); return; }
+      alert(`Follow-up sent to ${email}`);
+    } catch (e) { alert('Follow-up failed: ' + e); }
+  } else {
+    window.open(`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+  }
+}
+
+async function deleteTrackerContact(email, idx) {
+  if (!confirm(`Remove ${email} from tracker?`)) return;
+  try {
+    await fetch('/api/delete-contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  } catch (e) { console.warn('delete failed:', e); }
+  outreachLog.splice(idx, 1);
+  document.getElementById('tracker-badge').textContent = outreachLog.length;
+  document.getElementById('tracker-total').textContent = outreachLog.length;
+  renderTracker();
 }
 
 function showTracker() {

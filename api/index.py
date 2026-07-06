@@ -252,6 +252,15 @@ def get_contacts():
         return jsonify([])
 
 
+@app.route('/api/delete-contact', methods=['POST'])
+def delete_contact():
+    email = (request.json or {}).get('email', '').strip().lower()
+    if not email:
+        return jsonify({'error': 'email required'}), 400
+    _supabase('DELETE', f'/contacts?email=eq.{urllib.parse.quote(email)}')
+    return jsonify({'deleted': True})
+
+
 @app.route('/api/save-contact', methods=['POST'])
 def save_contact():
     data    = request.json or {}
