@@ -4,7 +4,7 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python",
-      "config": { "includeFiles": ["NovaflowOverview.png"] }
+      "config": { "includeFiles": ["api/NovaflowOverview.png"] }
     }
   ],
   "routes": [

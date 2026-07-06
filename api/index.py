@@ -571,7 +571,7 @@ def gmail_status():
     return jsonify({'connected': bool(_get_token_row(email))})
 
 
-_OVERVIEW_PNG = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'NovaflowOverview.png')
+_OVERVIEW_PNG = os.path.join(os.path.dirname(__file__), 'NovaflowOverview.png')
 
 def _build_raw_message(from_email, to_email, subject, body, attach_overview=False):
     if attach_overview and os.path.exists(_OVERVIEW_PNG):
