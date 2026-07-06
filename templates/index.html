@@ -925,11 +925,11 @@ function getSubject() {
 function buildEmail(contact, para, senderKey) {
   const sender  = SENDERS[senderKey];
   const closing = pickClosing(contact.job_title, senderKey);
-  let body = `Hello ${contact.first_name},\n\n`;
+  let body = `Hello,\n\n`;
   if (currentMode === 'conference' && conferenceName) {
     const city = conferenceLocation ? conferenceLocation.split(',')[0].trim() : '';
     const loc = city ? ` in ${city}` : '';
-    body += `I wanted to follow up after ${conferenceName}${loc}.\n\n`;
+    body += `I wanted to follow up after ${conferenceName}${loc}!\n\n`;
   } else {
     body += `I am so happy you connected with the Novaflow team last week at the Festival of Genomics! ${sender.intro}\n\n`;
   }
@@ -1164,7 +1164,7 @@ function updateFollowupUI(contact) {
 function buildFollowupEmail(contact, para, senderKey) {
   const sender  = SENDERS[senderKey];
   const closing = pickClosing(contact.job_title, senderKey);
-  let body = `Hello ${contact.first_name},\n\n`;
+  let body = `Hello,\n\n`;
   body += `Wanted to briefly follow up on my previous note about Novaflow.\n\n`;
   body += `${para}\n\n`;
   if (sender.calendarLine) body += `Feel free to book a time to chat here: ${CALENDAR_URL} or just reply and we can figure out next steps over email.\n\n`;
