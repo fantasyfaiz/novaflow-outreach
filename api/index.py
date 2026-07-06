@@ -129,8 +129,13 @@ def generate_paragraph(first_name, company, job_title, conference_name='', confe
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
     conference_line = ''
     if conference_name:
-        loc = f' in {conference_location}' if conference_location else ''
-        conference_line = f'\n- The recipient connected with Novaflow at {conference_name}{loc}'
+        city = conference_location.split(',')[0].strip() if conference_location else ''
+        loc  = f' in {city}' if city else ''
+        conference_line = (
+            f'\n- The recipient met Novaflow at {conference_name}{loc}'
+            f'\n- Do NOT mention the conference name or location in the paragraph — '
+            f'it is already referenced in the opening line of the email'
+        )
     prompt = f"""Write exactly ONE paragraph (4-5 sentences) for a biotech/genomics software outreach email.
 
 Recipient:
