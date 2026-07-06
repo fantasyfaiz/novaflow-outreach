@@ -1308,7 +1308,7 @@ async function approve() {
   if (!toRaw) return;
 
   if (gmailConnected) {
-    const fromEmail = document.getElementById('from-email').value.trim();
+    const fromEmail = document.getElementById('sender-email').value.trim();
     try {
       const res = await fetch('/api/send-now', {
         method: 'POST',
