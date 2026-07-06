@@ -51,6 +51,7 @@ class _TextExtractor(HTMLParser):
 
 REQUIRED_COLS = {'First Name', 'Last Name', 'Email', 'Company', 'Job Title'}
 CANONICAL     = {col.lower(): col for col in REQUIRED_COLS | {'Grade'}}
+CANONICAL['company profile name'] = 'Company'
 
 
 def parse_csv_stream(stream):
