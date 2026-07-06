@@ -8,6 +8,7 @@ import ssl
 import base64
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from html.parser import HTMLParser
@@ -436,7 +437,7 @@ Page text:
 def _supabase(method, path, data=None, params=None):
     url = f'{SUPABASE_URL}/rest/v1{path}'
     if params:
-        url += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+        url += '?' + urllib.parse.urlencode(params)
     body = json.dumps(data).encode() if data is not None else None
     req  = urllib.request.Request(url, data=body, method=method, headers={
         'apikey':        SUPABASE_KEY,
