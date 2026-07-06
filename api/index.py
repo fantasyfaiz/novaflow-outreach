@@ -575,6 +575,24 @@ def schedule_email():
     return jsonify({'scheduled': True})
 
 
+@app.route('/api/send-now', methods=['POST'])
+def send_now():
+    data = request.json or {}
+    for field in ('from_email', 'to_email', 'subject', 'body'):
+        if not data.get(field):
+            return jsonify({'error': f'{field} is required'}), 400
+    svc = _gmail_service(data['from_email'])
+    if not svc:
+        return jsonify({'error': 'Gmail not connected for this sender'}), 400
+    msg = MIMEText(data['body'])
+    msg['to']      = data['to_email']
+    msg['from']    = data['from_email']
+    msg['subject'] = data['subject']
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    svc.users().messages().send(userId='me', body={'raw': raw}).execute()
+    return jsonify({'sent': True})
+
+
 @app.route('/api/process-scheduled', methods=['GET', 'POST'])
 def process_scheduled():
     secret = (request.headers.get('X-Cron-Secret')

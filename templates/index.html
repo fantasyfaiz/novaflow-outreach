@@ -1301,16 +1301,30 @@ async function generateEmail() {
   }
 }
 
-function approve() {
+async function approve() {
   if (!currentEmail) return;
   const toRaw   = document.getElementById('contact-email').value.trim();
-  const to      = encodeURIComponent(toRaw);
-  const subject = encodeURIComponent(followupMode ? 'Re: ' + getSubject() : getSubject());
-  const body    = encodeURIComponent(currentEmail);
-  if (to) {
-    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_blank');
-    if (!followupMode) markSent(toRaw);
+  const subject = followupMode ? 'Re: ' + getSubject() : getSubject();
+  if (!toRaw) return;
+
+  if (gmailConnected) {
+    const fromEmail = document.getElementById('from-email').value.trim();
+    try {
+      const res = await fetch('/api/send-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: currentEmail }),
+      }).then(r => r.json());
+      if (res.error) { alert('Send failed: ' + res.error); return; }
+    } catch (e) { alert('Send failed: ' + e); return; }
+  } else {
+    const to  = encodeURIComponent(toRaw);
+    const sub = encodeURIComponent(subject);
+    const bod = encodeURIComponent(currentEmail);
+    window.open(`mailto:${to}?subject=${sub}&body=${bod}`, '_blank');
   }
+
+  if (!followupMode) markSent(toRaw);
   logOutreach(currentContact, toRaw, currentSender);
   if (toRaw && currentContact) saveContact({ ...currentContact, email: toRaw });
   loadContact(currentIdx + 1);
