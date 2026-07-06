@@ -516,8 +516,10 @@ def auth_google():
 
 @app.route('/auth/callback')
 def auth_callback():
-    flow = _make_flow(state=session.get('oauth_state'))
-    flow.fetch_token(authorization_response=request.url)
+    state = session.get('oauth_state') or request.args.get('state')
+    flow = _make_flow(state=state)
+    callback_url = request.url.replace('http://', 'https://', 1)
+    flow.fetch_token(authorization_response=callback_url)
     email = session.get('oauth_sender', '')
     if email:
         _save_token(email, flow.credentials)
