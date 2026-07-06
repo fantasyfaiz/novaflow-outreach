@@ -115,7 +115,7 @@ def generate_followup_paragraph(first_name, company, job_title):
     client = anthropic.Anthropic()
     prompt = f"""Write exactly ONE short paragraph (2-3 sentences) for a follow-up outreach email.
 
-Context: This is a follow-up to an earlier cold outreach email about Novaflow (a bioinformatics/genomics analysis platform, YC-backed) sent about a week ago with no response.
+Context: This is a follow-up to an earlier cold outreach email about Novaflow (a bioinformatics/genomics analysis platform, YC-backed) sent about a week ago with no response. Never use the word "startup".
 
 Recipient:
 - Name: {first_name}
@@ -169,7 +169,7 @@ Recipient:
 
 About Novaflow:
 - Bioinformatics analysis platform that takes raw genomic/sequencing data and produces results fast
-- YC-backed startup built by researchers for researchers
+- YC-backed platform built by researchers for researchers
 - Labs at Harvard and Johns Hopkins are already using it
 - Offering to analyze the recipient's own dataset for free, no commitment, no strings attached
 
@@ -181,6 +181,7 @@ Requirements:
 - Do not start with "I"
 - Do not use any em dashes
 - Do not include any greeting or sign-off
+- Never use the word "startup" — refer to Novaflow as a platform or company
 - Output only the paragraph text"""
 
     response = client.messages.create(
