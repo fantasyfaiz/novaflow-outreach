@@ -1336,7 +1336,7 @@ async function saveContact(contact) {
     const res = await fetch('/api/save-contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contact, mode: currentMode || 'researcher' }),
+      body: JSON.stringify({ contact, mode: currentMode || 'researcher', conference_name: conferenceName || '' }),
     }).then(r => r.json());
     if (res.error) console.warn('save-contact failed:', res.error);
   } catch (e) {
@@ -1359,7 +1359,7 @@ async function loadTrackerFromSupabase() {
       title:      r.job_title || '',
       email:      r.email || '',
       mode:       r.mode || 'researcher',
-      conference: null,
+      conference: r.conference_name || null,
       sender:     '',
       ts:         new Date(r.date_contacted),
     }));
@@ -1392,7 +1392,7 @@ function renderTracker() {
     return;
   }
   list.innerHTML = outreachLog.map((e, i) => {
-    const modeLabel = e.mode === 'conference' ? `✦ ${e.conference || 'conference'}` : '⊙ researcher';
+    const modeLabel = e.mode === 'conference' ? `✦ ${e.conference || 'conference'}` : '⊙ researcher outreach';
     const time = e.ts instanceof Date && !isNaN(e.ts)
       ? e.ts.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + e.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : '';

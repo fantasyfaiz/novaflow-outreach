@@ -189,7 +189,7 @@ Requirements:
     return ""
 
 
-def save_contact_to_supabase(contact, mode):
+def save_contact_to_supabase(contact, mode, conference_name=None):
     """Upsert one contact into the Supabase `contacts` table.
     Returns the inserted/updated row dict. Raises RuntimeError on failure."""
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -205,8 +205,9 @@ def save_contact_to_supabase(contact, mode):
         'job_title':      contact.get('job_title',  '').strip(),
         'date_contacted': now.isoformat(),
         'email_status':   'sent',
-        'mode':           'conference' if mode == 'conference' else 'researcher',
-        'follow_up_due':  due_date.isoformat(),
+        'mode':            'conference' if mode == 'conference' else 'researcher',
+        'conference_name': conference_name or '',
+        'follow_up_due':   due_date.isoformat(),
     }
 
     # on_conflict on the lower(email) unique index — re-sends update the row.
@@ -242,7 +243,7 @@ def get_contacts():
         return jsonify([])
     try:
         rows = _supabase('GET', '/contacts', params={
-            'select': 'first_name,last_name,email,company,job_title,date_contacted,mode',
+            'select': 'first_name,last_name,email,company,job_title,date_contacted,mode,conference_name',
             'order':  'date_contacted.desc',
             'limit':  '500',
         })
@@ -258,7 +259,7 @@ def save_contact():
     if not contact or not contact.get('email', '').strip():
         return jsonify({'error': 'contact with email is required'}), 400
     try:
-        row = save_contact_to_supabase(contact, data.get('mode', 'researcher'))
+        row = save_contact_to_supabase(contact, data.get('mode', 'researcher'), data.get('conference_name'))
         return jsonify({'saved': True, 'contact': row})
     except RuntimeError as e:
         return jsonify({'error': str(e)}), 502
