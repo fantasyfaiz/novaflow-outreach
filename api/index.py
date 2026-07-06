@@ -68,10 +68,12 @@ class _TextExtractor(HTMLParser):
 
 
 REQUIRED_COLS  = {'Email', 'Company'}
-OPTIONAL_COLS  = {'First Name', 'Last Name', 'Job Title'}
+OPTIONAL_COLS  = {'First Name', 'Last Name', 'Job Title', 'Professional Background'}
 CANONICAL      = {col.lower(): col for col in REQUIRED_COLS | OPTIONAL_COLS | {'Grade'}}
 CANONICAL['company profile name'] = 'Company'
 CANONICAL['main email']           = 'Email'
+CANONICAL['brief description']    = 'Professional Background'
+CANONICAL['description']          = 'Professional Background'
 
 
 def parse_csv_stream(stream):
@@ -97,11 +99,12 @@ def parse_csv_stream(stream):
         email = row.get('Email', '').strip()
         if email:
             contacts.append({
-                'first_name': row.get('First Name', '').strip(),
-                'last_name':  row.get('Last Name',  '').strip(),
-                'email':      email,
-                'company':    row.get('Company',    '').strip(),
-                'job_title':  row.get('Job Title',  '').strip(),
+                'first_name':              row.get('First Name',              '').strip(),
+                'last_name':               row.get('Last Name',               '').strip(),
+                'email':                   email,
+                'company':                 row.get('Company',                 '').strip(),
+                'job_title':               row.get('Job Title',               '').strip(),
+                'professional_background': row.get('Professional Background', '').strip(),
             })
 
     note = 'filtered to Neutral grade' if has_grade else 'all contacts loaded'
@@ -145,7 +148,7 @@ Requirements:
     return ""
 
 
-def generate_paragraph(first_name, company, job_title, conference_name='', conference_location=''):
+def generate_paragraph(first_name, company, job_title, conference_name='', conference_location='', background=''):
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
     conference_line = ''
     if conference_name:
@@ -156,12 +159,13 @@ def generate_paragraph(first_name, company, job_title, conference_name='', confe
             f'\n- Do NOT mention the conference name or location in the paragraph — '
             f'it is already referenced in the opening line of the email'
         )
+    background_line = f'\n- Background/description: {background[:800]}' if background else ''
     prompt = f"""Write exactly ONE paragraph (4-5 sentences) for a biotech/genomics software outreach email.
 
 Recipient:
 - Name: {first_name}
 - Company: {company}
-- Job Title: {job_title}{conference_line}
+- Job Title: {job_title}{background_line}{conference_line}
 
 About Novaflow:
 - Bioinformatics analysis platform that takes raw genomic/sequencing data and produces results fast
@@ -321,6 +325,7 @@ def generate_email():
             contact.get('job_title',  ''),
             data.get('conference_name', ''),
             data.get('conference_location', ''),
+            contact.get('professional_background', ''),
         )
         return jsonify({'para': para})
     except Exception as e:
