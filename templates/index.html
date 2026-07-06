@@ -369,6 +369,72 @@
     }
     .active-label .dot-green { color: #4ade80; }
 
+    /* ─── Gmail status + schedule ───────────────────────────── */
+    .gmail-status {
+      display: flex; align-items: center; gap: 7px; margin-top: 8px;
+      font-size: 10px; letter-spacing: 0.05em; font-family: 'Martian Mono', monospace;
+    }
+    .gmail-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .gmail-dot.on  { background: #4ade80; box-shadow: 0 0 5px #4ade80; }
+    .gmail-dot.off { background: #f59e0b; }
+    .gmail-status-text { color: #8b7bb8; }
+    .gmail-connect-link {
+      color: #7c3aed; cursor: pointer; text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    #btn-schedule {
+      background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3); color: #4338ca;
+    }
+    #btn-schedule:not(:disabled):hover {
+      background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.55);
+    }
+
+    /* ─── Schedule modal ────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(30,19,64,0.45); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 14px; padding: 28px 32px;
+      min-width: 340px; max-width: 420px; width: 90%;
+      box-shadow: 0 8px 40px rgba(109,40,217,0.18), 0 0 0 1px rgba(109,40,217,0.1);
+    }
+    .modal-title { font-size: 13px; font-weight: 700; color: #1e1340; margin-bottom: 4px; }
+    .modal-sub   { font-size: 10px; color: #8b7bb8; letter-spacing: 0.04em;
+                   font-family: 'Martian Mono', monospace; margin-bottom: 20px; }
+    .modal-label { font-size: 10px; letter-spacing: 0.12em; color: #8b7bb8;
+                   text-transform: uppercase; margin-bottom: 6px; }
+    .modal-dt {
+      font-family: inherit; font-size: 12px; color: #1e1340;
+      background: rgba(124,58,237,0.04); border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 8px; outline: none; width: 100%; padding: 9px 13px;
+      transition: border-color 0.15s;
+    }
+    .modal-dt:focus { border-color: rgba(124,58,237,0.5); }
+    .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+    .modal-confirm {
+      flex: 1; font-family: inherit; font-size: 11px; letter-spacing: 0.05em;
+      padding: 9px 0; border-radius: 8px;
+      border: 1px solid rgba(99,102,241,0.35); background: rgba(99,102,241,0.1);
+      color: #4338ca; cursor: pointer; transition: all 0.15s;
+    }
+    .modal-confirm:hover { background: rgba(99,102,241,0.18); }
+    .modal-cancel {
+      font-family: inherit; font-size: 11px; letter-spacing: 0.05em;
+      padding: 9px 18px; border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.08); background: transparent;
+      color: #8b7bb8; cursor: pointer; transition: all 0.15s;
+    }
+    .modal-cancel:hover { background: rgba(0,0,0,0.04); }
+    .modal-feedback {
+      font-size: 10px; margin-top: 10px; letter-spacing: 0.04em;
+      font-family: 'Martian Mono', monospace; display: none;
+    }
+    .modal-feedback.success { color: #059669; }
+    .modal-feedback.error   { color: #dc2626; }
+
     /* ─── Scrape form ─────────────────────────────────────── */
     .scrape-form { display: flex; flex-direction: column; gap: 8px; }
     .scrape-input {
@@ -605,7 +671,12 @@
             <div class="sender-from">
               <span class="from-label">from</span>
               <input type="email" id="sender-email" class="sender-email-input"
-                     placeholder="your@email.com" autocomplete="email">
+                     placeholder="your@email.com" autocomplete="email"
+                     oninput="onSenderEmailChange()">
+            </div>
+            <div class="gmail-status" id="gmail-status" style="display:none;">
+              <div class="gmail-dot" id="gmail-dot"></div>
+              <span class="gmail-status-text" id="gmail-status-text"></span>
             </div>
           </div>
         </div>
@@ -656,6 +727,7 @@
                 <button class="act-btn" id="btn-prev"     onclick="prevContact()" disabled>◀</button>
                 <button class="act-btn" id="btn-generate" onclick="generateEmail()" disabled>▸ generate()</button>
                 <button class="act-btn" id="btn-approve"  onclick="approve()"       disabled>▸ send()</button>
+                <button class="act-btn" id="btn-schedule" onclick="openScheduleModal()" disabled>▸ schedule()</button>
                 <button class="act-btn" id="btn-reject"   onclick="reject()">▸ next()</button>
               </div>
               <div class="action-row" id="followup-action-row" style="display:none; margin-top:6px;">
@@ -697,6 +769,21 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ══ SCHEDULE MODAL ════════════════════════════════════════ -->
+<div class="modal-overlay" id="schedule-modal" onclick="if(event.target===this)closeScheduleModal()">
+  <div class="modal-box">
+    <div class="modal-title">Schedule send</div>
+    <div class="modal-sub" id="modal-sub">to —</div>
+    <div class="modal-label">send at</div>
+    <input type="datetime-local" class="modal-dt" id="schedule-dt">
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeScheduleModal()">cancel</button>
+      <button class="modal-confirm" onclick="confirmSchedule()">▸ confirm schedule()</button>
+    </div>
+    <div class="modal-feedback" id="modal-feedback"></div>
   </div>
 </div>
 
@@ -1109,7 +1196,8 @@ function selectSender(key) {
     if (para) {
       currentEmail = buildEmail(currentContact, para, key);
       document.getElementById('email-preview').textContent = currentEmail;
-      document.getElementById('btn-approve').disabled  = false;
+      document.getElementById('btn-approve').disabled   = false;
+      document.getElementById('btn-schedule').disabled  = !gmailConnected;
       document.getElementById('btn-generate').textContent = '▸ regenerate()';
       document.getElementById('btn-generate').disabled = false;
     } else {
@@ -1130,8 +1218,9 @@ function loadContact(idx) {
   followupMode   = false;
   currentContact = contacts[idx] || null;
 
-  document.getElementById('btn-approve').disabled  = true;
-  document.getElementById('btn-generate').disabled = !currentSender;
+  document.getElementById('btn-approve').disabled   = true;
+  document.getElementById('btn-schedule').disabled  = true;
+  document.getElementById('btn-generate').disabled  = !currentSender;
   document.getElementById('btn-generate').textContent = '▸ generate()';
   document.getElementById('btn-prev').disabled = (idx <= 0);
 
@@ -1161,7 +1250,8 @@ function loadContact(idx) {
   if (para && currentSender) {
     currentEmail = buildEmail(currentContact, para, currentSender);
     document.getElementById('email-preview').textContent = currentEmail;
-    document.getElementById('btn-approve').disabled  = false;
+    document.getElementById('btn-approve').disabled   = false;
+    document.getElementById('btn-schedule').disabled  = !gmailConnected;
     document.getElementById('btn-generate').textContent = '▸ regenerate()';
   } else {
     document.getElementById('email-preview').innerHTML =
@@ -1200,8 +1290,9 @@ async function generateEmail() {
     paraCache[currentContact.email] = data.para;
     currentEmail = buildEmail(currentContact, data.para, currentSender);
     document.getElementById('email-preview').textContent = currentEmail;
-    document.getElementById('btn-approve').disabled  = false;
-    document.getElementById('btn-generate').disabled = false;
+    document.getElementById('btn-approve').disabled   = false;
+    document.getElementById('btn-schedule').disabled  = !gmailConnected;
+    document.getElementById('btn-generate').disabled  = false;
     document.getElementById('btn-generate').textContent = '▸ regenerate()';
   } catch {
     document.getElementById('spinner').style.display = 'none';
@@ -1330,6 +1421,126 @@ function backToUpload() {
   document.getElementById('screen-upload').style.display = 'flex';
   document.getElementById('email-subject').textContent   = getSubject();
 }
+
+/* ── Gmail status + scheduled send ──────────────────────────── */
+let gmailConnected  = false;
+let gmailCheckTimer = null;
+
+function onSenderEmailChange() {
+  clearTimeout(gmailCheckTimer);
+  gmailCheckTimer = setTimeout(checkGmailStatus, 600);
+}
+
+async function checkGmailStatus() {
+  const email = document.getElementById('sender-email').value.trim();
+  const statusEl = document.getElementById('gmail-status');
+  const dot      = document.getElementById('gmail-dot');
+  const txt      = document.getElementById('gmail-status-text');
+  const schedBtn = document.getElementById('btn-schedule');
+
+  if (!email) {
+    statusEl.style.display = 'none';
+    gmailConnected = false;
+    schedBtn.disabled = true;
+    return;
+  }
+
+  statusEl.style.display = 'flex';
+  txt.innerHTML = 'checking...';
+  dot.className = 'gmail-dot off';
+
+  try {
+    const data = await fetch(`/api/gmail-status?email=${encodeURIComponent(email)}`).then(r => r.json());
+    gmailConnected = data.connected;
+    if (gmailConnected) {
+      dot.className = 'gmail-dot on';
+      txt.innerHTML = 'Gmail connected — schedule send enabled';
+      if (currentEmail) schedBtn.disabled = false;
+    } else {
+      dot.className = 'gmail-dot off';
+      txt.innerHTML = `Gmail not connected &nbsp;<span class="gmail-connect-link" onclick="connectGmail()">connect →</span>`;
+      schedBtn.disabled = true;
+    }
+  } catch {
+    statusEl.style.display = 'none';
+  }
+}
+
+function connectGmail() {
+  const email = document.getElementById('sender-email').value.trim();
+  if (!email) return alert('Enter your from email first.');
+  window.location.href = `/auth/google?email=${encodeURIComponent(email)}`;
+}
+
+function openScheduleModal() {
+  if (!currentEmail || !currentContact) return;
+  const name = `${currentContact.first_name} ${currentContact.last_name}`;
+  const to   = document.getElementById('contact-email').value.trim();
+  document.getElementById('modal-sub').textContent = `to ${name} <${to}>`;
+
+  // Default to tomorrow same time
+  const dt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const pad = n => String(n).padStart(2, '0');
+  const local = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  const dtInput = document.getElementById('schedule-dt');
+  dtInput.value = local;
+  dtInput.min   = new Date().toISOString().slice(0,16);
+
+  document.getElementById('modal-feedback').style.display = 'none';
+  document.getElementById('schedule-modal').classList.add('open');
+}
+
+function closeScheduleModal() {
+  document.getElementById('schedule-modal').classList.remove('open');
+}
+
+async function confirmSchedule() {
+  const dtVal  = document.getElementById('schedule-dt').value;
+  const fb     = document.getElementById('modal-feedback');
+  if (!dtVal) { fb.className = 'modal-feedback error'; fb.style.display='block'; fb.textContent = 'Pick a date and time.'; return; }
+
+  const scheduledAt  = new Date(dtVal).toISOString();
+  const fromEmail    = document.getElementById('sender-email').value.trim();
+  const toEmail      = document.getElementById('contact-email').value.trim();
+  const subject      = followupMode ? 'Re: ' + getSubject() : getSubject();
+
+  fb.className = 'modal-feedback'; fb.style.display='block'; fb.textContent = 'scheduling...';
+
+  try {
+    const data = await fetch('/api/schedule-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from_email:   fromEmail,
+        to_email:     toEmail,
+        subject,
+        body:         currentEmail,
+        scheduled_at: scheduledAt,
+      }),
+    }).then(r => r.json());
+
+    if (data.error) {
+      fb.className = 'modal-feedback error'; fb.textContent = '✕ ' + data.error;
+    } else {
+      fb.className = 'modal-feedback success';
+      fb.textContent = `✓ Scheduled for ${new Date(dtVal).toLocaleString()}`;
+      logOutreach(currentContact, toEmail, currentSender);
+      if (toEmail && currentContact) saveContact({ ...currentContact, email: toEmail });
+      setTimeout(() => { closeScheduleModal(); loadContact(currentIdx + 1); }, 1200);
+    }
+  } catch {
+    fb.className = 'modal-feedback error'; fb.textContent = '✕ Network error. Try again.';
+  }
+}
+
+// Handle ?gmail_connected=1 redirect from OAuth callback
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('gmail_connected') === '1') {
+    history.replaceState({}, '', '/');
+    // Status will update when user returns to email screen and their from email is set
+  }
+})();
 </script>
 </body>
 </html>

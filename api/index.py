@@ -5,14 +5,20 @@ import json
 import json as json_module
 import re
 import ssl
+import base64
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta, timezone
+from email.mime.text import MIMEText
 from html.parser import HTMLParser
 import anthropic
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, session
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleRequest
+from googleapiclient.discovery import build
 
 BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FOG_CSV_PATH = os.path.join(BASE_DIR, 'data', 'fog_booth_only.csv')
@@ -21,10 +27,17 @@ SUPABASE_URL   = os.environ.get('SUPABASE_URL', '').rstrip('/')
 SUPABASE_KEY   = os.environ.get('SUPABASE_KEY', '')
 FOLLOW_UP_DAYS = int(os.environ.get('FOLLOW_UP_DAYS', '7'))
 
+GOOGLE_CLIENT_ID     = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+OAUTH_REDIRECT_URI   = os.environ.get('OAUTH_REDIRECT_URI', 'http://127.0.0.1:5000/auth/callback')
+CRON_SECRET          = os.environ.get('CRON_SECRET', '')
+GMAIL_SCOPES         = ['https://www.googleapis.com/auth/gmail.send']
+
 app = Flask(__name__,
             template_folder=os.path.join(BASE_DIR, 'templates'),
             static_folder=os.path.join(BASE_DIR, 'public'),
             static_url_path='')
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-change-in-prod')
 
 class _TextExtractor(HTMLParser):
     SKIP_TAGS = {'script', 'style', 'nav', 'footer', 'noscript', 'svg', 'iframe'}
@@ -416,6 +429,165 @@ Page text:
         'note': f'{len(clean)} researchers scraped from {url}',
         'source_url': url,
     })
+
+
+# ── Gmail helpers ─────────────────────────────────────────────
+
+def _supabase(method, path, data=None, params=None):
+    url = f'{SUPABASE_URL}/rest/v1{path}'
+    if params:
+        url += '?' + '&'.join(f'{k}={v}' for k, v in params.items())
+    body = json.dumps(data).encode() if data is not None else None
+    req  = urllib.request.Request(url, data=body, method=method, headers={
+        'apikey':        SUPABASE_KEY,
+        'Authorization': f'Bearer {SUPABASE_KEY}',
+        'Content-Type':  'application/json',
+        'Prefer':        'return=representation,resolution=merge-duplicates',
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode() or '[]')
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f'Supabase {e.code}: {e.read().decode("utf-8","replace")}')
+
+
+def _get_token_row(email):
+    rows = _supabase('GET', '/gmail_tokens', params={
+        'email': f'eq.{email}', 'select': '*',
+    })
+    return rows[0] if rows else None
+
+
+def _save_token(email, creds):
+    _supabase('POST', '/gmail_tokens?on_conflict=email', data=[{
+        'email':         email,
+        'access_token':  creds.token,
+        'refresh_token': creds.refresh_token,
+        'token_expiry':  creds.expiry.isoformat() if creds.expiry else None,
+    }])
+
+
+def _gmail_service(email):
+    row = _get_token_row(email)
+    if not row:
+        return None
+    creds = Credentials(
+        token=row['access_token'],
+        refresh_token=row.get('refresh_token'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=GMAIL_SCOPES,
+    )
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GoogleRequest())
+        _save_token(email, creds)
+    return build('gmail', 'v1', credentials=creds)
+
+
+def _make_flow(state=None):
+    return Flow.from_client_config(
+        {'web': {
+            'client_id':     GOOGLE_CLIENT_ID,
+            'client_secret': GOOGLE_CLIENT_SECRET,
+            'auth_uri':      'https://accounts.google.com/o/oauth2/auth',
+            'token_uri':     'https://oauth2.googleapis.com/token',
+        }},
+        scopes=GMAIL_SCOPES,
+        redirect_uri=OAUTH_REDIRECT_URI,
+        state=state,
+    )
+
+
+# ── Gmail OAuth routes ─────────────────────────────────────────
+
+@app.route('/auth/google')
+def auth_google():
+    email = request.args.get('email', '')
+    session['oauth_sender'] = email
+    flow = _make_flow()
+    auth_url, state = flow.authorization_url(
+        access_type='offline', prompt='consent',
+    )
+    session['oauth_state'] = state
+    return redirect(auth_url)
+
+
+@app.route('/auth/callback')
+def auth_callback():
+    flow = _make_flow(state=session.get('oauth_state'))
+    flow.fetch_token(authorization_response=request.url)
+    email = session.get('oauth_sender', '')
+    if email:
+        _save_token(email, flow.credentials)
+    return redirect('/?gmail_connected=1')
+
+
+@app.route('/api/gmail-status')
+def gmail_status():
+    email = request.args.get('email', '').strip().lower()
+    if not email or not SUPABASE_URL:
+        return jsonify({'connected': False})
+    return jsonify({'connected': bool(_get_token_row(email))})
+
+
+# ── Scheduled send routes ──────────────────────────────────────
+
+@app.route('/api/schedule-email', methods=['POST'])
+def schedule_email():
+    data = request.json or {}
+    for field in ('from_email', 'to_email', 'subject', 'body', 'scheduled_at'):
+        if not data.get(field):
+            return jsonify({'error': f'{field} is required'}), 400
+    if not _get_token_row(data['from_email']):
+        return jsonify({'error': 'Gmail not connected for this sender'}), 400
+    _supabase('POST', '/scheduled_emails', data=[{
+        'from_email':   data['from_email'],
+        'to_email':     data['to_email'],
+        'subject':      data['subject'],
+        'body':         data['body'],
+        'scheduled_at': data['scheduled_at'],
+        'status':       'pending',
+    }])
+    return jsonify({'scheduled': True})
+
+
+@app.route('/api/process-scheduled', methods=['GET', 'POST'])
+def process_scheduled():
+    secret = (request.headers.get('X-Cron-Secret')
+              or request.args.get('secret', ''))
+    if CRON_SECRET and secret != CRON_SECRET:
+        return jsonify({'error': 'unauthorized'}), 401
+
+    now  = datetime.now(timezone.utc).isoformat()
+    rows = _supabase('GET', '/scheduled_emails', params={
+        'status':       'eq.pending',
+        'scheduled_at': f'lte.{now}',
+        'select':       '*',
+    })
+
+    sent = errors = 0
+    for row in rows:
+        row_id = row['id']
+        try:
+            svc = _gmail_service(row['from_email'])
+            if not svc:
+                raise RuntimeError(f'No Gmail token for {row["from_email"]}')
+            msg = MIMEText(row['body'])
+            msg['to']      = row['to_email']
+            msg['from']    = row['from_email']
+            msg['subject'] = row['subject']
+            raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+            svc.users().messages().send(userId='me', body={'raw': raw}).execute()
+            _supabase('PATCH', f'/scheduled_emails?id=eq.{row_id}',
+                      data={'status': 'sent'})
+            sent += 1
+        except Exception as e:
+            _supabase('PATCH', f'/scheduled_emails?id=eq.{row_id}',
+                      data={'status': 'failed', 'error': str(e)})
+            errors += 1
+
+    return jsonify({'processed': len(rows), 'sent': sent, 'errors': errors})
 
 
 if __name__ == '__main__':
