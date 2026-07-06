@@ -234,6 +234,21 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/api/get-contacts', methods=['GET'])
+def get_contacts():
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return jsonify([])
+    try:
+        rows = _supabase('GET', '/contacts', params={
+            'select': 'first_name,last_name,email,company,job_title,date_contacted,mode',
+            'order':  'date_contacted.desc',
+            'limit':  '500',
+        })
+        return jsonify(rows)
+    except RuntimeError:
+        return jsonify([])
+
+
 @app.route('/api/save-contact', methods=['POST'])
 def save_contact():
     data    = request.json or {}

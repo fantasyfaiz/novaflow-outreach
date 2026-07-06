@@ -1350,8 +1350,27 @@ function reject()       { loadContact(currentIdx + 1); }
 /* ── Outreach Tracker ─────────────────────────────────────── */
 let outreachLog = [];
 
+async function loadTrackerFromSupabase() {
+  try {
+    const rows = await fetch('/api/get-contacts').then(r => r.json());
+    outreachLog = rows.map(r => ({
+      name:       `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+      company:    r.company || '',
+      title:      r.job_title || '',
+      email:      r.email || '',
+      mode:       r.mode || 'researcher',
+      conference: null,
+      sender:     '',
+      ts:         new Date(r.date_contacted),
+    }));
+    document.getElementById('tracker-badge').textContent = outreachLog.length;
+    document.getElementById('tracker-total').textContent = outreachLog.length;
+    renderTracker();
+  } catch (e) { console.warn('tracker load failed:', e); }
+}
+
 function logOutreach(contact, email, sender) {
-  outreachLog.push({
+  outreachLog.unshift({
     name:       `${contact.first_name} ${contact.last_name}`,
     company:    contact.company,
     title:      contact.job_title,
@@ -1373,8 +1392,10 @@ function renderTracker() {
     return;
   }
   list.innerHTML = outreachLog.map((e, i) => {
-    const modeLabel = e.mode === 'conference' ? `✦ ${e.conference}` : '⊙ researcher';
-    const time = e.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const modeLabel = e.mode === 'conference' ? `✦ ${e.conference || 'conference'}` : '⊙ researcher';
+    const time = e.ts instanceof Date && !isNaN(e.ts)
+      ? e.ts.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + e.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
     return `<div class="tracker-row">
       <div class="tracker-num">${i + 1}</div>
       <div class="tracker-body">
@@ -1552,9 +1573,11 @@ async function confirmSchedule() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('gmail_connected') === '1') {
     history.replaceState({}, '', '/');
-    // Status will update when user returns to email screen and their from email is set
   }
 })();
+
+// Load persisted tracker data on page init
+loadTrackerFromSupabase();
 </script>
 </body>
 </html>
