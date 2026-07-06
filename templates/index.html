@@ -1313,7 +1313,7 @@ async function approve() {
       const res = await fetch('/api/send-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: currentEmail }),
+        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: currentEmail, attach_png: !followupMode }),
       }).then(r => r.json());
       if (res.error) { alert('Send failed: ' + res.error); return; }
     } catch (e) { alert('Send failed: ' + e); return; }
@@ -1551,6 +1551,7 @@ async function confirmSchedule() {
         subject,
         body:         currentEmail,
         scheduled_at: scheduledAt,
+        attach_png:   !followupMode,
       }),
     }).then(r => r.json());
 

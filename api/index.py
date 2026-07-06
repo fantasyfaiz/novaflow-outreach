@@ -13,6 +13,8 @@ import urllib.error
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 from html.parser import HTMLParser
 import anthropic
 import requests
@@ -569,6 +571,24 @@ def gmail_status():
     return jsonify({'connected': bool(_get_token_row(email))})
 
 
+_OVERVIEW_PNG = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'NovaflowOverview.png')
+
+def _build_raw_message(from_email, to_email, subject, body, attach_overview=False):
+    if attach_overview and os.path.exists(_OVERVIEW_PNG):
+        msg = MIMEMultipart('mixed')
+        msg.attach(MIMEText(body, 'plain'))
+        with open(_OVERVIEW_PNG, 'rb') as f:
+            img = MIMEImage(f.read(), name='NovaflowOverview.png')
+            img.add_header('Content-Disposition', 'attachment', filename='NovaflowOverview.png')
+            msg.attach(img)
+    else:
+        msg = MIMEText(body)
+    msg['to']      = to_email
+    msg['from']    = from_email
+    msg['subject'] = subject
+    return base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+
 # ── Scheduled send routes ──────────────────────────────────────
 
 @app.route('/api/schedule-email', methods=['POST'])
@@ -586,6 +606,7 @@ def schedule_email():
         'body':         data['body'],
         'scheduled_at': data['scheduled_at'],
         'status':       'pending',
+        'attach_png':   data.get('attach_png', True),
     }])
     return jsonify({'scheduled': True})
 
@@ -599,11 +620,10 @@ def send_now():
     svc = _gmail_service(data['from_email'])
     if not svc:
         return jsonify({'error': 'Gmail not connected for this sender'}), 400
-    msg = MIMEText(data['body'])
-    msg['to']      = data['to_email']
-    msg['from']    = data['from_email']
-    msg['subject'] = data['subject']
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    raw = _build_raw_message(
+        data['from_email'], data['to_email'], data['subject'], data['body'],
+        attach_overview=data.get('attach_png', False),
+    )
     svc.users().messages().send(userId='me', body={'raw': raw}).execute()
     return jsonify({'sent': True})
 
@@ -629,11 +649,10 @@ def process_scheduled():
             svc = _gmail_service(row['from_email'])
             if not svc:
                 raise RuntimeError(f'No Gmail token for {row["from_email"]}')
-            msg = MIMEText(row['body'])
-            msg['to']      = row['to_email']
-            msg['from']    = row['from_email']
-            msg['subject'] = row['subject']
-            raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+            raw = _build_raw_message(
+                row['from_email'], row['to_email'], row['subject'], row['body'],
+                attach_overview=row.get('attach_png', True),
+            )
             svc.users().messages().send(userId='me', body={'raw': raw}).execute()
             _supabase('PATCH', f'/scheduled_emails?id=eq.{row_id}',
                       data={'status': 'sent'})
