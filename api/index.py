@@ -6,6 +6,8 @@ import json as json_module
 import re
 import ssl
 import base64
+import hashlib
+import secrets
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -505,29 +507,40 @@ def _make_flow(state=None):
 @app.route('/auth/google')
 def auth_google():
     email = request.args.get('email', '')
-    session['oauth_sender'] = email
-    flow = _make_flow()
-    auth_url, state = flow.authorization_url(
+    code_verifier = secrets.token_urlsafe(32)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).rstrip(b'=').decode()
+    # Embed email + verifier in state so no session needed
+    state_payload = base64.urlsafe_b64encode(
+        json.dumps({'e': email, 'cv': code_verifier}).encode()
+    ).decode().rstrip('=')
+    flow = _make_flow(state=state_payload)
+    auth_url, _ = flow.authorization_url(
         access_type='offline', prompt='consent',
+        code_challenge=code_challenge,
+        code_challenge_method='S256',
     )
-    session['oauth_state'] = state
-    # Persist PKCE verifier the library may have auto-generated
-    cv = getattr(flow.oauth2session, 'code_verifier', None)
-    if cv:
-        session['code_verifier'] = cv
     return redirect(auth_url)
 
 
 @app.route('/auth/callback')
 def auth_callback():
-    state = session.get('oauth_state') or request.args.get('state')
-    flow = _make_flow(state=state)
+    raw_state = request.args.get('state', '')
+    email, code_verifier = '', ''
+    try:
+        padded = raw_state + '=' * (4 - len(raw_state) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded).decode())
+        email = payload.get('e', '')
+        code_verifier = payload.get('cv', '')
+    except Exception:
+        pass
+    flow = _make_flow(state=raw_state)
     callback_url = request.url.replace('http://', 'https://', 1)
     flow.fetch_token(
         authorization_response=callback_url,
-        code_verifier=session.get('code_verifier') or None,
+        code_verifier=code_verifier or None,
     )
-    email = session.get('oauth_sender', '')
     if email:
         _save_token(email, flow.credentials)
     return redirect('/?gmail_connected=1')
