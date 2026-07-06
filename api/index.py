@@ -583,7 +583,7 @@ def gmail_status():
 
 _OVERVIEW_PNG = os.path.join(os.path.dirname(__file__), 'NovaflowOverview.png')
 
-def _build_raw_message(from_email, to_email, subject, body, attach_overview=False):
+def _build_raw_message(from_email, to_email, subject, body, attach_overview=False, cc=None):
     if attach_overview and os.path.exists(_OVERVIEW_PNG):
         msg = MIMEMultipart('mixed')
         msg.attach(MIMEText(body, 'plain'))
@@ -596,6 +596,8 @@ def _build_raw_message(from_email, to_email, subject, body, attach_overview=Fals
     msg['to']      = to_email
     msg['from']    = from_email
     msg['subject'] = subject
+    if cc:
+        msg['cc'] = cc
     return base64.urlsafe_b64encode(msg.as_bytes()).decode()
 
 
@@ -633,6 +635,7 @@ def send_now():
     raw = _build_raw_message(
         data['from_email'], data['to_email'], data['subject'], data['body'],
         attach_overview=data.get('attach_png', False),
+        cc=data.get('cc') or None,
     )
     svc.users().messages().send(userId='me', body={'raw': raw}).execute()
     return jsonify({'sent': True})

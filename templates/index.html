@@ -401,6 +401,14 @@
       background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.55);
     }
 
+    #btn-cc {
+      background: transparent; border-color: rgba(124,58,237,0.2); color: #9d7be8;
+      font-size: 10px;
+    }
+    #btn-cc.active {
+      background: rgba(124,58,237,0.12); border-color: rgba(124,58,237,0.5); color: #7c3aed;
+    }
+
     /* ─── Schedule modal ────────────────────────────────────── */
     .modal-overlay {
       display: none; position: fixed; inset: 0; z-index: 100;
@@ -741,6 +749,7 @@
                 <button class="act-btn" id="btn-approve"  onclick="approve()"       disabled>▸ send()</button>
                 <button class="act-btn" id="btn-schedule" onclick="openScheduleModal()" disabled>▸ schedule()</button>
                 <button class="act-btn" id="btn-reject"   onclick="reject()">▸ next()</button>
+                <button class="act-btn" id="btn-cc"       onclick="toggleCC()">CC amulya</button>
               </div>
               <div class="action-row" id="followup-action-row" style="display:none; margin-top:6px;">
                 <button class="act-btn" id="btn-draft-followup" onclick="draftFollowup()">▸ followup()</button>
@@ -1325,7 +1334,7 @@ async function approve() {
       const res = await fetch('/api/send-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: currentEmail, attach_png: !followupMode }),
+        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: currentEmail, attach_png: !followupMode, cc: ccAmulya ? 'amulya@novaflowapp.com' : '' }),
       }).then(r => r.json());
       if (res.error) { alert('Send failed: ' + res.error); return; }
     } catch (e) { alert('Send failed: ' + e); return; }
@@ -1510,6 +1519,14 @@ function backToUpload() {
 
 /* ── Gmail status + scheduled send ──────────────────────────── */
 let gmailConnected  = false;
+let ccAmulya        = false;
+
+function toggleCC() {
+  ccAmulya = !ccAmulya;
+  const btn = document.getElementById('btn-cc');
+  btn.classList.toggle('active', ccAmulya);
+  btn.textContent = ccAmulya ? '✓ CC amulya' : 'CC amulya';
+}
 let gmailCheckTimer = null;
 
 function onSenderEmailChange() {
@@ -1603,6 +1620,7 @@ async function confirmSchedule() {
         body:         currentEmail,
         scheduled_at: scheduledAt,
         attach_png:   !followupMode,
+        cc:           ccAmulya ? 'amulya@novaflowapp.com' : '',
       }),
     }).then(r => r.json());
 
