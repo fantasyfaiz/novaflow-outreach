@@ -733,7 +733,7 @@
               <div class="section-label">draft</div>
               <div class="subject-label">subject</div>
               <div class="subject-val" id="email-subject">Following up from Festival of Genomics -&gt; Novaflow</div>
-              <div class="email-box" id="email-preview">
+              <div class="email-box" id="email-preview" contenteditable="true" spellcheck="true" oninput="currentEmail = this.innerText">
                 <span class="placeholder">select a sender above, then run generate().</span>
               </div>
               <div class="spinner" id="spinner"></div>
@@ -1330,11 +1330,12 @@ async function approve() {
 
   if (gmailConnected) {
     const fromEmail = document.getElementById('sender-email').value.trim();
+    const bodyText  = document.getElementById('email-preview').innerText;
     try {
       const res = await fetch('/api/send-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: currentEmail, attach_png: !followupMode, cc: ccAmulya ? 'amulya@novaflowapp.com' : '' }),
+        body: JSON.stringify({ from_email: fromEmail, to_email: toRaw, subject, body: bodyText, attach_png: !followupMode, cc: ccAmulya ? 'amulya@novaflowapp.com' : '' }),
       }).then(r => r.json());
       if (res.error) { alert('Send failed: ' + res.error); return; }
     } catch (e) { alert('Send failed: ' + e); return; }
@@ -1606,6 +1607,7 @@ async function confirmSchedule() {
   const fromEmail    = document.getElementById('sender-email').value.trim();
   const toEmail      = document.getElementById('contact-email').value.trim();
   const subject      = followupMode ? 'Re: ' + getSubject() : getSubject();
+  const bodyText     = document.getElementById('email-preview').innerText;
 
   fb.className = 'modal-feedback'; fb.style.display='block'; fb.textContent = 'scheduling...';
 
@@ -1617,7 +1619,7 @@ async function confirmSchedule() {
         from_email:   fromEmail,
         to_email:     toEmail,
         subject,
-        body:         currentEmail,
+        body:         bodyText,
         scheduled_at: scheduledAt,
         attach_png:   !followupMode,
         cc:           ccAmulya ? 'amulya@novaflowapp.com' : '',
