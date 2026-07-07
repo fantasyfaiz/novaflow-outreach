@@ -1582,10 +1582,10 @@ function openScheduleModal() {
   const to   = document.getElementById('contact-email').value.trim();
   document.getElementById('modal-sub').textContent = `to ${name} <${to}>`;
 
-  // Default to tomorrow same time
+  // Default to tomorrow at 8:00 AM
   const dt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   const pad = n => String(n).padStart(2, '0');
-  const local = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  const local = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T08:00`;
   const dtInput = document.getElementById('schedule-dt');
   dtInput.value = local;
   dtInput.min   = new Date().toISOString().slice(0,16);
