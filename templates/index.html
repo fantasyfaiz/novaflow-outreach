@@ -707,7 +707,12 @@
             <div class="progress-track">
               <div class="progress-fill" id="progress-bar" style="width:0%"></div>
             </div>
-            <div class="progress-text" id="progress-label">— / — contacts</div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+              <div class="progress-text" id="progress-label">— / — contacts</div>
+              <input type="range" id="contact-slider" min="0" max="0" value="0"
+                style="flex:1; accent-color:#7c3aed; height:3px; cursor:pointer; display:none;"
+                oninput="loadContact(parseInt(this.value))">
+            </div>
           </div>
         </div>
 
@@ -1231,6 +1236,10 @@ function updateProgress(idx) {
   const pct = total > 0 ? Math.round((idx / total) * 100) : 0;
   document.getElementById('progress-bar').style.width  = pct + '%';
   document.getElementById('progress-label').textContent = `${idx} / ${total} contacts`;
+  const slider = document.getElementById('contact-slider');
+  slider.max   = Math.max(0, total - 1);
+  slider.value = idx;
+  slider.style.display = total > 1 ? 'block' : 'none';
 }
 
 function loadContact(idx) {
